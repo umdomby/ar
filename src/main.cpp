@@ -8,8 +8,9 @@ using namespace websockets;
 
 const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
-const char* websocket_server = "ws://192.168.0.151:8080";
-const char* deviceId = "123";
+//const char* websocket_server = "ws://213.184.249.66:8085";
+const char* websocket_server = "wss://ardu.site:444/";
+const char* deviceId = "444";
 
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
