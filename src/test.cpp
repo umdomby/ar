@@ -1,14 +1,14 @@
 // #include <Arduino.h>
 // #include <ESP8266WiFi.h>
 
-// // // Двигатель A 
-// // int enA = 9;
-// // int in1 = 8;
-// // int in2 = 7;
-// // // Двигатель B
-// // int enB = 3;
-// // int in3 = 5;
-// // int in4 = 4;
+// // Двигатель A 
+// int enA = 9;
+// int in1 = 8;
+// int in2 = 7;
+// // Двигатель B
+// int enB = 3;
+// int in3 = 5;
+// int in4 = 4;
 
 // #define enA D6
 // #define in1 D2
