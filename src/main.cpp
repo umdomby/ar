@@ -149,6 +149,13 @@ void onMessageCallback(WebsocketsMessage message) {
     const char* command = doc["command"];
     if(!command) return;
 
+    else if(strcmp(command, "set_servo") == 0) {
+        int angle = doc["params"]["angle"];
+        angle = constrain(angle, 0, 180); // Ограничиваем угол 0-180 градусами
+        startServoMove(angle, 500); // Плавное движение за 500 мс
+        sendCommandAck("set_servo");
+    }
+
     if(strcmp(command, "motor_a_forward") == 0) {
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
@@ -211,6 +218,7 @@ void setup() {
         while(1) delay(100);
     }
     Servo1.setSpeed(60);
+    Servo1.write(90); // Устанавливаем начальное положение
 
     // Подключение к WiFi
     WiFi.begin(ssid, password);
@@ -238,10 +246,10 @@ void setup() {
 
 void loop() {
     // Управление сервоприводом
-    if (!isServoMoving && millis() - lastServoMoveTime > 3000) {
-        int newTarget = (servoTargetPosition == 180 || servoTargetPosition == 90) ? 0 : 180;
-        startServoMove(newTarget, 1000);
-    }
+    // if (!isServoMoving && millis() - lastServoMoveTime > 3000) {
+    //     int newTarget = (servoTargetPosition == 180 || servoTargetPosition == 90) ? 0 : 180;
+    //     startServoMove(newTarget, 1000);
+    // }
     
     updateServoPosition();
 
