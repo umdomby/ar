@@ -37,8 +37,10 @@
  */
 
 #if defined(ESP8266)
-#define SERVO1_PIN 13 // D7
-#define SERVO2_PIN 15 // D8
+#define SERVO1_PIN 5 // D1
+#define SERVO2_PIN 2 // D4
+// #define SERVO1_PIN 13 // D7
+// #define SERVO2_PIN 15 // D8
 // #define SERVO3_PIN 13 // D7
 #define SPEED_IN_PIN 0
 

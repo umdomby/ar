@@ -2,20 +2,24 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoWebsockets.h>
 #include <ArduinoJson.h>
+#include "ServoEasing.hpp"
+
+#define SERVO1_PIN D1
+ServoEasing Servo1;
 
 using namespace websockets;
 
 const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
 const char* websocket_server = "wss://ardu.site/ws";
-const char* deviceId = "123";
+const char* deviceId = "444";
 
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
 unsigned long lastHeartbeatTime = 0;
 unsigned long lastHeartbeat2Time = 0;
 bool wasConnected = false;
-bool isIdentified = false;  // Добавляем флаг идентификации
+bool isIdentified = false;
 
 // Motor pins
 #define enA D6
@@ -24,6 +28,34 @@ bool isIdentified = false;  // Добавляем флаг идентифика�
 #define enB D5
 #define in3 D3
 #define in4 D8
+
+// Servo control
+unsigned long lastServoMoveTime = 0;
+int servoTargetPosition = 90; // Начальная позиция
+bool isServoMoving = false;
+unsigned long servoMoveStartTime = 0;
+int servoStartPosition = 90;
+unsigned long servoMoveDuration = 1000; // Длительность движения по умолчанию
+
+void startServoMove(int targetPos, unsigned long duration) {
+    if (isServoMoving) return;
+    
+    servoStartPosition = Servo1.read();
+    servoTargetPosition = targetPos;
+    servoMoveDuration = duration;
+    servoMoveStartTime = millis();
+    isServoMoving = true;
+    
+    Servo1.setSpeed(60);
+    Servo1.easeTo(servoTargetPosition, servoMoveDuration);
+}
+
+void updateServoPosition() {
+    if (isServoMoving && !Servo1.isMoving()) {
+        isServoMoving = false;
+        lastServoMoveTime = millis();
+    }
+}
 
 void sendLogMessage(const char* message) {
     if(client.available()) {
@@ -38,7 +70,7 @@ void sendLogMessage(const char* message) {
 }
 
 void sendCommandAck(const char* command) {
-    if(client.available() && isIdentified) {  // Отправляем только после идентификации
+    if(client.available() && isIdentified) {
         StaticJsonDocument<96> doc;
         doc["type"] = "command_ack";
         doc["command"] = command;
@@ -56,14 +88,13 @@ void stopMotors() {
     digitalWrite(in2, LOW);
     digitalWrite(in3, LOW);
     digitalWrite(in4, LOW);
-    if(isIdentified) {  // Отправляем только если идентифицированы
+    if(isIdentified) {
         sendLogMessage("Motors stopped");
     }
 }
 
 void identifyDevice() {
     if(client.available()) {
-        // 1. Отправляем тип клиента
         StaticJsonDocument<128> typeDoc;
         typeDoc["type"] = "client_type";
         typeDoc["clientType"] = "esp";
@@ -71,7 +102,6 @@ void identifyDevice() {
         serializeJson(typeDoc, typeOutput);
         client.send(typeOutput);
 
-        // 2. Отправляем идентификацию
         StaticJsonDocument<128> doc;
         doc["type"] = "identify";
         doc["deviceId"] = deviceId;
@@ -86,16 +116,13 @@ void identifyDevice() {
 void connectToServer() {
     Serial.println("Connecting to server...");
     client.addHeader("Origin", "http://ardu.site");
-    client.setInsecure(); // Для обхода проверки SSL
+    client.setInsecure();
     
     if(client.connect(websocket_server)) {
         Serial.println("WebSocket connected!");
         wasConnected = true;
-        isIdentified = false; // Сбрасываем флаг при новом подключении
-        
-        // Отправляем идентификацию
+        isIdentified = false;
         identifyDevice();
-        
     } else {
         Serial.println("WebSocket connection failed!");
         wasConnected = false;
@@ -106,9 +133,12 @@ void connectToServer() {
 void onMessageCallback(WebsocketsMessage message) {
     StaticJsonDocument<192> doc;
     DeserializationError error = deserializeJson(doc, message.data());
-    if(error) return;
+    if(error) {
+        Serial.print("JSON parse error: ");
+        Serial.println(error.c_str());
+        return;
+    }
 
-    // Проверяем сообщение об успешной идентификации
     if(doc["type"] == "system" && doc["status"] == "connected") {
         isIdentified = true;
         Serial.println("Successfully identified!");
@@ -173,9 +203,18 @@ void onEventsCallback(WebsocketsEvent event, String data) {
 
 void setup() {
     Serial.begin(115200);
-    
+    delay(1000); // Даем время для инициализации Serial
+
+    // Инициализация сервопривода
+    if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO) {
+        Serial.println("Error attaching servo");
+        while(1) delay(100);
+    }
+    Servo1.setSpeed(60);
+
     // Подключение к WiFi
     WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi");
     while(WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -185,8 +224,6 @@ void setup() {
     // Настройка WebSocket
     client.onMessage(onMessageCallback);
     client.onEvent(onEventsCallback);
-    
-    // Первое подключение
     connectToServer();
 
     // Инициализация моторов
@@ -200,6 +237,15 @@ void setup() {
 }
 
 void loop() {
+    // Управление сервоприводом
+    if (!isServoMoving && millis() - lastServoMoveTime > 3000) {
+        int newTarget = (servoTargetPosition == 180 || servoTargetPosition == 90) ? 0 : 180;
+        startServoMove(newTarget, 1000);
+    }
+    
+    updateServoPosition();
+
+    // Работа с WebSocket
     if(!client.available()) {
         if(millis() - lastReconnectAttempt > 5000) {
             lastReconnectAttempt = millis();
@@ -208,19 +254,17 @@ void loop() {
     } else {
         client.poll();
 
-        // Heartbeat каждые 10 секунд (только после идентификации)
-        if(isIdentified && millis() - lastHeartbeatTime > 10000) {
-            lastHeartbeatTime = millis();
-            sendLogMessage("Heartbeat - OK");
-        }
-
-        // Проверка Heartbeat2
-        if(millis() - lastHeartbeat2Time > 2000) {
-            stopMotors();
-        }
-
-        // Повторная идентификация, если еще не идентифицировались
-        if(!isIdentified && millis() - lastReconnectAttempt > 2000) {
+        if(isIdentified) {
+            if(millis() - lastHeartbeatTime > 10000) {
+                lastHeartbeatTime = millis();
+                sendLogMessage("Heartbeat - OK");
+            }
+            
+            if(millis() - lastHeartbeat2Time > 2000) {
+                stopMotors();
+            }
+        } else if(millis() - lastReconnectAttempt > 3000) {
+            lastReconnectAttempt = millis();
             identifyDevice();
         }
     }
