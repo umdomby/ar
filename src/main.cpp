@@ -40,13 +40,16 @@ unsigned long servoMoveDuration = 1000; // Длительность движен
 void startServoMove(int targetPos, unsigned long duration) {
     if (isServoMoving) return;
     
+    // Дополнительная проверка на допустимый диапазон (на всякий случай)
+    targetPos = constrain(targetPos, 0, 165);
+    
     servoStartPosition = Servo1.read();
     servoTargetPosition = targetPos;
     servoMoveDuration = duration;
     servoMoveStartTime = millis();
     isServoMoving = true;
     
-    Servo1.setSpeed(60);
+    Servo1.setSpeed(60); // Убедитесь, что скорость адекватная
     Servo1.easeTo(servoTargetPosition, servoMoveDuration);
 }
 
@@ -151,11 +154,21 @@ void onMessageCallback(WebsocketsMessage message) {
 
     else if(strcmp(command, "set_servo") == 0) {
         int angle = doc["params"]["angle"];
-        angle = constrain(angle, 0, 180); // Ограничиваем угол 0-180 градусами
-        startServoMove(angle, 500); // Плавное движение за 500 мс
-        sendCommandAck("set_servo");
+        // Жесткое ограничение угла
+        if(angle < 0) {
+            angle = 0;
+            sendLogMessage("Warning: Servo angle clamped to 0 (was below minimum)");
+        } else if(angle > 165) {
+            angle = 165;
+            sendLogMessage("Warning: Servo angle clamped to 180 (was above maximum)");
+        }
+        
+        // Дополнительная проверка, чтобы не двигать серво, если угол не изменился
+        if(angle != Servo1.read()) {
+            startServoMove(angle, 500); // Плавное движение за 500 мс
+            sendCommandAck("set_servo");
+        }
     }
-
     if(strcmp(command, "motor_a_forward") == 0) {
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
