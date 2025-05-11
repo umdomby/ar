@@ -1,3 +1,46 @@
+// Полное → Сокращенное
+// type → ty
+// status → st
+// command → co
+// angle → an
+// speed → sp
+// motor → mo
+// message → me
+// deviceId → de
+// params → pa
+// timestamp → ts
+// origin → or
+// reason → re
+// clientType → ct
+
+// Команды:
+// motor_a_forward → MFA
+// motor_a_backward → MRA
+// motor_b_forward → MFB
+// motor_b_backward → MRB
+// set_speed → SPD
+// set_servo → SSR
+// stop → STP
+// heartbeat2 → HBT
+
+// Типы сообщений:
+// system → sys
+// error → err
+// log → log
+// acknowledge → ack
+// client_type → clt
+// identify → idn
+// esp_status → est
+// command_status → cst
+
+// Статусы:
+// connected → con
+// disconnected → dis
+// awaiting_identification → awi
+// rejected → rej
+// delivered → dvd
+// esp_not_found → enf
+
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoWebsockets.h>
@@ -12,7 +55,7 @@ using namespace websockets;
 const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
 const char* websocket_server = "wss://ardua.site/wsar";
-const char* deviceId = "444";
+const char* de = "444"; // deviceId → de
 
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
@@ -20,7 +63,7 @@ unsigned long lastHeartbeatTime = 0;
 unsigned long lastHeartbeat2Time = 0;
 bool wasConnected = false;
 bool isIdentified = false;
-
+void sendCommandAck(const char* co, int sp = -1); // command → co, speed → sp
 // Motor pins
 #define enA D6
 #define in1 D2
@@ -38,8 +81,8 @@ int servoStartPosition = 90;
 unsigned long servoMoveDuration = 1000; // Длительность движения по умолчанию
 
 void startServoMove(int targetPos, unsigned long duration) {
-    if (isServoMoving) return;
-    
+if (isServoMoving) return;
+
     // Дополнительная проверка на допустимый диапазон (на всякий случай)
     targetPos = constrain(targetPos, 0, 165);
     
@@ -54,61 +97,66 @@ void startServoMove(int targetPos, unsigned long duration) {
 }
 
 void updateServoPosition() {
-    if (isServoMoving && !Servo1.isMoving()) {
-        isServoMoving = false;
-        lastServoMoveTime = millis();
-    }
+if (isServoMoving && !Servo1.isMoving()) {
+isServoMoving = false;
+lastServoMoveTime = millis();
+}
 }
 
-void sendLogMessage(const char* message) {
-    if(client.available()) {
-        StaticJsonDocument<256> doc;
-        doc["type"] = "log";
-        doc["message"] = message;
-        doc["deviceId"] = deviceId;
-        String output;
-        serializeJson(doc, output);
-        client.send(output);
-    }
+void sendLogMessage(const char* me) { // message → me
+if(client.available()) {
+StaticJsonDocument<256> doc;
+doc["ty"] = "log"; // type → ty
+doc["me"] = me; // message → me
+doc["de"] = de; // deviceId → de
+String output;
+serializeJson(doc, output);
+client.send(output);
+}
 }
 
-void sendCommandAck(const char* command) {
-    if(client.available() && isIdentified) {
-        StaticJsonDocument<256> doc;
-        doc["type"] = "command_ack";
-        doc["command"] = command;
-        doc["deviceId"] = deviceId;
-        String output;
-        serializeJson(doc, output);
-                Serial.println("Sending device ID: " + output);  // Логируем отправляемый ID
-        client.send(output);
-    }
+void sendCommandAck(const char* co, int sp) { // command → co
+if(client.available() && isIdentified) {
+StaticJsonDocument<256> doc;
+doc["ty"] = "ack"; // type → ty, acknowledge → ack
+doc["co"] = co; // command → co
+doc["de"] = de; // deviceId → de
+
+        // Добавляем скорость в лог только для команд SPD и если скорость указана
+        if (strcmp(co, "SPD") == 0 && sp != -1) { // set_speed → SPD
+            doc["sp"] = sp; // speed → sp
+        }
+String output;
+serializeJson(doc, output);
+Serial.println("Sending device ID: " + output);  // Логируем отправляемый ID
+client.send(output);
+}
 }
 
 void stopMotors() {
-    analogWrite(enA, 0);
-    analogWrite(enB, 0);
-    digitalWrite(in1, LOW);
-    digitalWrite(in2, LOW);
-    digitalWrite(in3, LOW);
-    digitalWrite(in4, LOW);
-    if(isIdentified) {
-        sendLogMessage("Motors stopped");
-    }
+analogWrite(enA, 0);
+analogWrite(enB, 0);
+digitalWrite(in1, LOW);
+digitalWrite(in2, LOW);
+digitalWrite(in3, LOW);
+digitalWrite(in4, LOW);
+if(isIdentified) {
+sendLogMessage("Motors stopped");
+}
 }
 
 void identifyDevice() {
-    if(client.available()) {
-        StaticJsonDocument<128> typeDoc;
-        typeDoc["type"] = "client_type";
-        typeDoc["clientType"] = "esp";
-        String typeOutput;
-        serializeJson(typeDoc, typeOutput);
-        client.send(typeOutput);
+if(client.available()) {
+StaticJsonDocument<128> typeDoc;
+typeDoc["ty"] = "clt"; // type → ty, client_type → clt
+typeDoc["ct"] = "esp"; // clientType → ct
+String typeOutput;
+serializeJson(typeDoc, typeOutput);
+client.send(typeOutput);
 
         StaticJsonDocument<128> doc;
-        doc["type"] = "identify";
-        doc["deviceId"] = deviceId;
+        doc["ty"] = "idn"; // type → ty, identify → idn
+        doc["de"] = de; // deviceId → de
         String output;
         serializeJson(doc, output);
         client.send(output);
@@ -118,10 +166,10 @@ void identifyDevice() {
 }
 
 void connectToServer() {
-    Serial.println("Connecting to server...");
-    client.addHeader("Origin", "http://ardua.site");
-    client.setInsecure();
-    
+Serial.println("Connecting to server...");
+client.addHeader("Origin", "http://ardua.site");
+client.setInsecure();
+
     if(client.connect(websocket_server)) {
         Serial.println("WebSocket connected!");
         wasConnected = true;
@@ -135,96 +183,103 @@ void connectToServer() {
 }
 
 void onMessageCallback(WebsocketsMessage message) {
-    StaticJsonDocument<192> doc;
-    DeserializationError error = deserializeJson(doc, message.data());
-    if(error) {
-        Serial.print("JSON parse error: ");
-        Serial.println(error.c_str());
-        return;
-    }
+StaticJsonDocument<192> doc;
+DeserializationError error = deserializeJson(doc, message.data());
+if(error) {
+    Serial.print("JSON parse error: ");
+    Serial.println(error.c_str());
+    return;
+}
 
-    if(doc["type"] == "system" && doc["status"] == "connected") {
+    if(doc["ty"] == "sys" && doc["st"] == "con") { // type → ty, system → sys, status → st, connected → con
         isIdentified = true;
         Serial.println("Successfully identified!");
         sendLogMessage("ESP connected and identified");
         return;
     }
 
-    const char* command = doc["command"];
-    if(!command) return;
+    const char* co = doc["co"]; // command → co
+    if(!co) return;
 
-    else if(strcmp(command, "set_servo") == 0) {
-        int angle = doc["params"]["angle"];
+    else if(strcmp(co, "SSR") == 0) { // set_servo → SSR
+        int an = doc["pa"]["an"]; // params → pa, angle → an
         // Жесткое ограничение угла
-        if(angle < 0) {
-            angle = 0;
+        if(an < 0) {
+            an = 0;
             sendLogMessage("Warning: Servo angle clamped to 0 (was below minimum)");
-        } else if(angle > 165) {
-            angle = 165;
+        } else if(an > 165) {
+            an = 165;
             sendLogMessage("Warning: Servo angle clamped to 180 (was above maximum)");
         }
         
         // Дополнительная проверка, чтобы не двигать серво, если угол не изменился
-        if(angle != Servo1.read()) {
-            startServoMove(angle, 500); // Плавное движение за 500 мс
-            sendCommandAck("set_servo");
+        if(an != Servo1.read()) {
+            startServoMove(an, 500); // Плавное движение за 500 мс
+            sendCommandAck("SSR"); // set_servo → SSR
         }
     }
-    if(strcmp(command, "motor_a_forward") == 0) {
+    if(strcmp(co, "MFA") == 0) { // motor_a_forward → MFA
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
     }
-    else if(strcmp(command, "motor_a_backward") == 0) {
+    else if(strcmp(co, "MRA") == 0) { // motor_a_backward → MRA
         digitalWrite(in1, LOW);
         digitalWrite(in2, HIGH);
     }
-    else if(strcmp(command, "motor_b_forward") == 0) {
+    else if(strcmp(co, "MFB") == 0) { // motor_b_forward → MFB
         digitalWrite(in3, HIGH);
         digitalWrite(in4, LOW);
     }
-    else if(strcmp(command, "motor_b_backward") == 0) {
+    else if(strcmp(co, "MRB") == 0) { // motor_b_backward → MRB
         digitalWrite(in3, LOW);
         digitalWrite(in4, HIGH);
     }
-    else if(strcmp(command, "set_speed") == 0) {
-        const char* motor = doc["params"]["motor"];
-        int speed = doc["params"]["speed"];
-        if(strcmp(motor, "A") == 0) analogWrite(enA, speed);
-        else if(strcmp(motor, "B") == 0) analogWrite(enB, speed);
+    else if(strcmp(co, "SPD") == 0) { // set_speed
+        const char* mo = doc["pa"]["mo"]; // motor
+        int speed = doc["pa"]["sp"];     // speed
+        
+        if(strcmp(mo, "A") == 0) {
+            analogWrite(enA, speed);
+            sendCommandAck("SPD", speed); // Отправляем с текущей скоростью
+        }
+        else if(strcmp(mo, "B") == 0) {
+            analogWrite(enB, speed);
+            sendCommandAck("SPD", speed); // Отправляем с текущей скоростью
+        }
     }
-    else if(strcmp(command, "stop") == 0) {
+    else if(strcmp(co, "STP") == 0) { // stop → STP
         stopMotors();
     }
-    else if(strcmp(command, "heartbeat2") == 0) {
+    else if(strcmp(co, "HBT") == 0) { // heartbeat2 → HBT
         lastHeartbeat2Time = millis();
         return;
     }
 
-    if(strcmp(command, "heartbeat2") != 0) {
-        sendCommandAck(command);
+    if(strcmp(co, "HBT") != 0) { // heartbeat2 → HBT
+        sendCommandAck(co); // command → co
     }
 }
 
 void onEventsCallback(WebsocketsEvent event, String data) {
-    if(event == WebsocketsEvent::ConnectionOpened) {
-        Serial.println("Connection opened");
-    }
-    else if(event == WebsocketsEvent::ConnectionClosed) {
-        Serial.println("Connection closed");
-        if(wasConnected) {
-            wasConnected = false;
-            isIdentified = false;
-            stopMotors();
-        }
-    }
-    else if(event == WebsocketsEvent::GotPing) {
-        client.pong();
-    }
+if(event == WebsocketsEvent::ConnectionOpened) {
+Serial.println("Connection opened");
+}
+else if(event == WebsocketsEvent::ConnectionClosed) {
+Serial.println("Connection closed");
+if(wasConnected) {
+wasConnected = false;
+isIdentified = false;
+stopMotors();
+}
+}
+else if(event == WebsocketsEvent::GotPing) {
+client.pong();
+}
 }
 
 void setup() {
-    Serial.begin(115200);
-    delay(1000); // Даем время для инициализации Serial
+Serial.begin(115200);
+delay(1000); // Даем время для инициализации Serial
 
     // Инициализация сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO) {
@@ -259,12 +314,6 @@ void setup() {
 }
 
 void loop() {
-    // Управление сервоприводом
-    // if (!isServoMoving && millis() - lastServoMoveTime > 3000) {
-    //     int newTarget = (servoTargetPosition == 180 || servoTargetPosition == 90) ? 0 : 180;
-    //     startServoMove(newTarget, 1000);
-    // }
-    
     updateServoPosition();
 
     // Работа с WebSocket
