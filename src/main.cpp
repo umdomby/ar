@@ -11,7 +11,7 @@ using namespace websockets;
 
 const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
-const char* websocket_server = "wss://ardu.site/ws";
+const char* websocket_server = "wss://ardua.site/wsar";
 const char* deviceId = "444";
 
 WebsocketsClient client;
@@ -62,7 +62,7 @@ void updateServoPosition() {
 
 void sendLogMessage(const char* message) {
     if(client.available()) {
-        StaticJsonDocument<128> doc;
+        StaticJsonDocument<256> doc;
         doc["type"] = "log";
         doc["message"] = message;
         doc["deviceId"] = deviceId;
@@ -74,12 +74,13 @@ void sendLogMessage(const char* message) {
 
 void sendCommandAck(const char* command) {
     if(client.available() && isIdentified) {
-        StaticJsonDocument<96> doc;
+        StaticJsonDocument<256> doc;
         doc["type"] = "command_ack";
         doc["command"] = command;
         doc["deviceId"] = deviceId;
         String output;
         serializeJson(doc, output);
+                Serial.println("Sending device ID: " + output);  // Логируем отправляемый ID
         client.send(output);
     }
 }
