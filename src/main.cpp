@@ -119,7 +119,7 @@ void identifyDevice() {
 
 void connectToServer() {
     Serial.println("Connecting to server...");
-    client.addHeader("Origin", "http://ardu.site");
+    client.addHeader("Origin", "http://ardua.site");
     client.setInsecure();
     
     if(client.connect(websocket_server)) {
