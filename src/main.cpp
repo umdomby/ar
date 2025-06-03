@@ -47,7 +47,8 @@
 #include <ArduinoJson.h>
 #include "ServoEasing.hpp"
 
-#define SERVO1_PIN D1
+#define SERVO1_PIN D7
+#define SERVO2_PIN D8
 ServoEasing Servo1;
 
 using namespace websockets;
@@ -65,12 +66,12 @@ bool wasConnected = false;
 bool isIdentified = false;
 void sendCommandAck(const char* co, int sp = -1); // command → co, speed → sp
 // Motor pins
-#define enA D6
+#define enA D1
 #define in1 D2
-#define in2 D7
-#define enB D5
-#define in3 D3
-#define in4 D8
+#define in2 D3
+#define in3 D4
+#define in4 D5
+#define enB D6
 
 // Servo control
 unsigned long lastServoMoveTime = 0;
