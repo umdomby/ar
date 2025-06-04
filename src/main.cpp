@@ -271,16 +271,18 @@ void onMessageCallback(WebsocketsMessage message) {
     lastHeartbeat2Time = millis();
     sendLogMessage("Heartbeat - OK");
     return;
-  } else if (strcmp(co, "RLY") == 0) {
+} else if (strcmp(co, "RLY") == 0) {
         const char* pin = doc["pa"]["pin"];
         const char* state = doc["pa"]["state"];
         
         if (strcmp(pin, "D0") == 0) {
-            digitalWrite(button1, strcmp(state, "on") == 0 ? HIGH : LOW);
+            digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH); // Инверсия: LOW для включения
+            Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1))); // Отладка
             sendLogMessage(strcmp(state, "on") == 0 ? "Реле 1 (D0) включено" : "Реле 1 (D0) выключено");
         } 
-        else if (strcmp(pin, "3") == 0) { // Изменено с D3 на 3
-            digitalWrite(button2, strcmp(state, "on") == 0 ? HIGH : LOW);
+        else if (strcmp(pin, "3") == 0) {
+            digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH); // Инверсия: LOW для включения
+            Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2))); // Отладка
             sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (3) включено" : "Реле 2 (3) выключено");
         }
         
@@ -295,6 +297,7 @@ void onMessageCallback(WebsocketsMessage message) {
         
         String output;
         serializeJson(ackDoc, output);
+        Serial.println("Sending ack: " + output); // Отладка
         client.send(output);
     }
 }
