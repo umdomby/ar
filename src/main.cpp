@@ -279,9 +279,9 @@ void onMessageCallback(WebsocketsMessage message) {
             digitalWrite(button1, strcmp(state, "on") == 0 ? HIGH : LOW);
             sendLogMessage(strcmp(state, "on") == 0 ? "Реле 1 (D0) включено" : "Реле 1 (D0) выключено");
         } 
-        else if (strcmp(pin, "D8") == 0) {
+        else if (strcmp(pin, "3") == 0) { // Изменено с D3 на 3
             digitalWrite(button2, strcmp(state, "on") == 0 ? HIGH : LOW);
-            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (D8) включено" : "Реле 2 (D8) выключено");
+            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (3) включено" : "Реле 2 (3) выключено");
         }
         
         // Отправляем подтверждение с текущим состоянием
