@@ -63,6 +63,7 @@
 #define SERVO1_PIN D7
 #define SERVO2_PIN D8
 ServoEasing Servo1;
+ServoEasing Servo2;
 
 using namespace websockets;
 
@@ -87,6 +88,14 @@ unsigned long servoMoveStartTime = 0;
 int servoStartPosition = 90;
 unsigned long servoMoveDuration = 1000; // Длительность движения по умолчанию
 
+// Servo control (второй сервопривод)
+unsigned long lastServo2MoveTime = 0;
+int servo2TargetPosition = 90; // Начальная позиция
+bool isServo2Moving = false;
+unsigned long servo2MoveStartTime = 0;
+int servo2StartPosition = 90;
+unsigned long servo2MoveDuration = 1000; // Длительность движения по умолчанию
+
 void startServoMove(int targetPos, unsigned long duration)
 {
   if (isServoMoving)
@@ -105,12 +114,35 @@ void startServoMove(int targetPos, unsigned long duration)
   Servo1.easeTo(servoTargetPosition, servoMoveDuration);
 }
 
+void startServo2Move(int targetPos, unsigned long duration) {
+  if (isServo2Moving)
+    return;
+
+  // Дополнительная проверка на допустимый диапазон
+  targetPos = constrain(targetPos, 0, 165);
+
+  servo2StartPosition = Servo2.read();
+  servo2TargetPosition = targetPos;
+  servo2MoveDuration = duration;
+  servo2MoveStartTime = millis();
+  isServo2Moving = true;
+
+  Servo2.setSpeed(60); // Убедитесь, что скорость адекватная
+  Servo2.easeTo(servo2TargetPosition, servo2MoveDuration);
+}
+
 void updateServoPosition()
 {
   if (isServoMoving && !Servo1.isMoving())
   {
     isServoMoving = false;
     lastServoMoveTime = millis();
+  }
+
+  // Проверка второго сервопривода
+  if (isServo2Moving && !Servo2.isMoving()) {
+    isServo2Moving = false;
+    lastServo2MoveTime = millis();
   }
 }
 
@@ -270,6 +302,19 @@ void onMessageCallback(WebsocketsMessage message)
       startServoMove(an, 500);
       sendCommandAck("SSR");
     }
+  }else if (strcmp(co, "SSR2") == 0) { // Новый блок для второго сервопривода
+    int an = doc["pa"]["an"];
+    if (an < 0) {
+      an = 0;
+      sendLogMessage("Warning: Servo2 angle clamped to 0");
+    } else if (an > 165) {
+      an = 165;
+      sendLogMessage("Warning: Servo2 angle clamped to 165");
+    }
+    if (an != Servo2.read()) {
+      startServo2Move(an, 500);
+      sendCommandAck("SSR2");
+    }
   }
   else if (strcmp(co, "MFA") == 0)
   {
@@ -384,7 +429,7 @@ void setup()
   delay(1000);
   Serial.println("Starting ESP8266..."); // Отладка
 
-  // Инициализация сервопривода
+  // Инициализация первого сервопривода
   if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
   {
     Serial.println("Error attaching servo");
@@ -393,6 +438,15 @@ void setup()
   }
   Servo1.setSpeed(60);
   Servo1.write(90);
+
+  // Инициализация второго сервопривода
+  if (Servo2.attach(SERVO2_PIN, 90) == INVALID_SERVO) {
+    Serial.println("Error attaching servo2");
+    while (1)
+      delay(100);
+  }
+  Servo2.setSpeed(60);
+  Servo2.write(90);
 
   // Подключение к WiFi
   WiFi.begin(ssid, password);
