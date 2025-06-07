@@ -89,54 +89,59 @@ unsigned long servoMoveDuration = 1000; // Длительность движен
 
 void startServoMove(int targetPos, unsigned long duration)
 {
-    if (isServoMoving)
-        return;
+  if (isServoMoving)
+    return;
 
-    // Дополнительная проверка на допустимый диапазон (на всякий случай)
-    targetPos = constrain(targetPos, 0, 165);
+  // Дополнительная проверка на допустимый диапазон (на всякий случай)
+  targetPos = constrain(targetPos, 0, 165);
 
-    servoStartPosition = Servo1.read();
-    servoTargetPosition = targetPos;
-    servoMoveDuration = duration;
-    servoMoveStartTime = millis();
-    isServoMoving = true;
+  servoStartPosition = Servo1.read();
+  servoTargetPosition = targetPos;
+  servoMoveDuration = duration;
+  servoMoveStartTime = millis();
+  isServoMoving = true;
 
-    Servo1.setSpeed(60); // Убедитесь, что скорость адекватная
-    Servo1.easeTo(servoTargetPosition, servoMoveDuration);
+  Servo1.setSpeed(60); // Убедитесь, что скорость адекватная
+  Servo1.easeTo(servoTargetPosition, servoMoveDuration);
 }
 
 void updateServoPosition()
 {
-    if (isServoMoving && !Servo1.isMoving())
-    {
-        isServoMoving = false;
-        lastServoMoveTime = millis();
-    }
+  if (isServoMoving && !Servo1.isMoving())
+  {
+    isServoMoving = false;
+    lastServoMoveTime = millis();
+  }
 }
 
 // Отправка логов
-void sendLogMessage(const char* me) {
-    if (client.available()) {
-        StaticJsonDocument<256> doc;
-        doc["ty"] = "log";
-        doc["me"] = me;
-        doc["de"] = de;
-        doc["b1"] = digitalRead(button1); // Состояние реле 1
-        doc["b2"] = digitalRead(button2); // Состояние реле 2
-        String output;
-        serializeJson(doc, output);
-        client.send(output);
-    }
+void sendLogMessage(const char *me)
+{
+  if (client.available())
+  {
+    StaticJsonDocument<256> doc;
+    doc["ty"] = "log";
+    doc["me"] = me;
+    doc["de"] = de;
+    doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
+    doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+    String output;
+    serializeJson(doc, output);
+    client.send(output);
+  }
 }
 
 // Подтверждение команды
-void sendCommandAck(const char* co, int sp) {
-  if (client.available() && isIdentified) {
+void sendCommandAck(const char *co, int sp)
+{
+  if (client.available() && isIdentified)
+  {
     StaticJsonDocument<256> doc;
     doc["ty"] = "ack";
     doc["co"] = co;
     doc["de"] = de;
-    if (strcmp(co, "SPD") == 0 && sp != -1) {
+    if (strcmp(co, "SPD") == 0 && sp != -1)
+    {
       doc["sp"] = sp;
     }
     String output;
@@ -148,66 +153,68 @@ void sendCommandAck(const char* co, int sp) {
 
 void stopMotors()
 {
-    analogWrite(enA, 0);
-    analogWrite(enB, 0);
-    digitalWrite(in1, LOW);
-    digitalWrite(in2, LOW);
-    digitalWrite(in3, LOW);
-    digitalWrite(in4, LOW);
-    if (isIdentified)
-    {
-        sendLogMessage("Motors stopped");
-    }
+  analogWrite(enA, 0);
+  analogWrite(enB, 0);
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  if (isIdentified)
+  {
+    sendLogMessage("Motors stopped");
+  }
 }
 
 void identifyDevice()
 {
-    if (client.available())
-    {
-        StaticJsonDocument<128> typeDoc;
-        typeDoc["ty"] = "clt"; // type → ty, client_type → clt
-        typeDoc["ct"] = "esp"; // clientType → ct
-        String typeOutput;
-        serializeJson(typeDoc, typeOutput);
-        client.send(typeOutput);
+  if (client.available())
+  {
+    StaticJsonDocument<128> typeDoc;
+    typeDoc["ty"] = "clt"; // type → ty, client_type → clt
+    typeDoc["ct"] = "esp"; // clientType → ct
+    String typeOutput;
+    serializeJson(typeDoc, typeOutput);
+    client.send(typeOutput);
 
-        StaticJsonDocument<128> doc;
-        doc["ty"] = "idn"; // type → ty, identify → idn
-        doc["de"] = de;    // deviceId → de
-        String output;
-        serializeJson(doc, output);
-        client.send(output);
+    StaticJsonDocument<128> doc;
+    doc["ty"] = "idn"; // type → ty, identify → idn
+    doc["de"] = de;    // deviceId → de
+    String output;
+    serializeJson(doc, output);
+    client.send(output);
 
-        Serial.println("Identification sent");
-    }
+    Serial.println("Identification sent");
+  }
 }
 
 void connectToServer()
 {
-    Serial.println("Connecting to server...");
-    client.addHeader("Origin", "http://ardua.site");
-    client.setInsecure();
+  Serial.println("Connecting to server...");
+  client.addHeader("Origin", "http://ardua.site");
+  client.setInsecure();
 
-    if (client.connect(websocket_server))
-    {
-        Serial.println("WebSocket connected!");
-        wasConnected = true;
-        isIdentified = false;
-        identifyDevice();
-    }
-    else
-    {
-        Serial.println("WebSocket connection failed!");
-        wasConnected = false;
-        isIdentified = false;
-    }
+  if (client.connect(websocket_server))
+  {
+    Serial.println("WebSocket connected!");
+    wasConnected = true;
+    isIdentified = false;
+    identifyDevice();
+  }
+  else
+  {
+    Serial.println("WebSocket connection failed!");
+    wasConnected = false;
+    isIdentified = false;
+  }
 }
 
 // Обработка входящих сообщений
-void onMessageCallback(WebsocketsMessage message) {
+void onMessageCallback(WebsocketsMessage message)
+{
   StaticJsonDocument<192> doc;
   DeserializationError error = deserializeJson(doc, message.data());
-  if (error) {
+  if (error)
+  {
     Serial.print("JSON parse error: ");
     Serial.println(error.c_str());
     return;
@@ -215,125 +222,174 @@ void onMessageCallback(WebsocketsMessage message) {
 
   Serial.println("Received message: " + message.data()); // Отладка
 
-  if (doc["ty"] == "sys" && doc["st"] == "con") {
+  if (doc["ty"] == "sys" && doc["st"] == "con")
+  {
     isIdentified = true;
     Serial.println("Successfully identified!");
     sendLogMessage("ESP connected and identified");
+
+    // Добавляем отправку состояния реле сразу после идентификации
+    char relayStatus[64];
+    snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+             digitalRead(button1) == LOW ? "on" : "off",
+             digitalRead(button2) == LOW ? "on" : "off");
+    sendLogMessage(relayStatus);
+
     return;
   }
 
-  const char* co = doc["co"];
-  if (!co) return;
+  const char *co = doc["co"];
+  if (!co)
+    return;
 
-  if (strcmp(co, "SSR") == 0) {
+  if (strcmp(co, "GET_RELAYS") == 0)
+  {
+    char relayStatus[64];
+    snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+             digitalRead(button1) == LOW ? "on" : "off",
+             digitalRead(button2) == LOW ? "on" : "off");
+    sendLogMessage(relayStatus);
+    return;
+  }
+
+  if (strcmp(co, "SSR") == 0)
+  {
     int an = doc["pa"]["an"];
-    if (an < 0) {
+    if (an < 0)
+    {
       an = 0;
       sendLogMessage("Warning: Servo angle clamped to 0");
-    } else if (an > 165) {
+    }
+    else if (an > 165)
+    {
       an = 165;
       sendLogMessage("Warning: Servo angle clamped to 165");
     }
-    if (an != Servo1.read()) {
+    if (an != Servo1.read())
+    {
       startServoMove(an, 500);
       sendCommandAck("SSR");
     }
-  } else if (strcmp(co, "MFA") == 0) {
+  }
+  else if (strcmp(co, "MFA") == 0)
+  {
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     sendCommandAck("MFA");
-  } else if (strcmp(co, "MRA") == 0) {
+  }
+  else if (strcmp(co, "MRA") == 0)
+  {
     digitalWrite(in1, LOW);
     digitalWrite(in2, HIGH);
     sendCommandAck("MRA");
-  } else if (strcmp(co, "MFB") == 0) {
+  }
+  else if (strcmp(co, "MFB") == 0)
+  {
     digitalWrite(in3, HIGH);
     digitalWrite(in4, LOW);
     sendCommandAck("MFB");
-  } else if (strcmp(co, "MRB") == 0) {
+  }
+  else if (strcmp(co, "MRB") == 0)
+  {
     digitalWrite(in3, LOW);
     digitalWrite(in4, HIGH);
     sendCommandAck("MRB");
-  } else if (strcmp(co, "SPD") == 0) {
-    const char* mo = doc["pa"]["mo"];
+  }
+  else if (strcmp(co, "SPD") == 0)
+  {
+    const char *mo = doc["pa"]["mo"];
     int speed = doc["pa"]["sp"];
-    if (strcmp(mo, "A") == 0) {
+    if (strcmp(mo, "A") == 0)
+    {
       analogWrite(enA, speed);
       sendCommandAck("SPD", speed);
-    } else if (strcmp(mo, "B") == 0) {
+    }
+    else if (strcmp(mo, "B") == 0)
+    {
       analogWrite(enB, speed);
       sendCommandAck("SPD", speed);
     }
-  } else if (strcmp(co, "STP") == 0) {
+  }
+  else if (strcmp(co, "STP") == 0)
+  {
     stopMotors();
     sendCommandAck("STP");
-  } else if (strcmp(co, "HBT") == 0) {
+  }
+  else if (strcmp(co, "HBT") == 0)
+  {
     lastHeartbeat2Time = millis();
     sendLogMessage("Heartbeat - OK");
     return;
-} else if (strcmp(co, "RLY") == 0) {
-        const char* pin = doc["pa"]["pin"];
-        const char* state = doc["pa"]["state"];
-        
-        if (strcmp(pin, "D0") == 0) {
-            digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH); // Инверсия: LOW для включения
-            Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1))); // Отладка
-            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 1 (D0) включено" : "Реле 1 (D0) выключено");
-        } 
-        else if (strcmp(pin, "3") == 0) {
-            digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH); // Инверсия: LOW для включения
-            Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2))); // Отладка
-            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (3) включено" : "Реле 2 (3) выключено");
-        }
-        
-        // Отправляем подтверждение с текущим состоянием
-        StaticJsonDocument<256> ackDoc;
-        ackDoc["ty"] = "ack";
-        ackDoc["co"] = "RLY";
-        ackDoc["de"] = de;
-        JsonObject pa = ackDoc.createNestedObject("pa");
-        pa["pin"] = pin;
-        pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "on" : "off";
-        
-        String output;
-        serializeJson(ackDoc, output);
-        Serial.println("Sending ack: " + output); // Отладка
-        client.send(output);
+  }
+  else if (strcmp(co, "RLY") == 0)
+  {
+    const char *pin = doc["pa"]["pin"];
+    const char *state = doc["pa"]["state"];
+
+    if (strcmp(pin, "D0") == 0)
+    {
+      digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);           // Инверсия: LOW для включения
+      Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1))); // Отладка
+      sendLogMessage(strcmp(state, "on") == 0 ? "Реле 1 (D0) включено" : "Реле 1 (D0) выключено");
     }
+    else if (strcmp(pin, "3") == 0)
+    {
+      digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);          // Инверсия: LOW для включения
+      Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2))); // Отладка
+      sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (3) включено" : "Реле 2 (3) выключено");
+    }
+
+    // Отправляем подтверждение с текущим состоянием
+    StaticJsonDocument<256> ackDoc;
+    ackDoc["ty"] = "ack";
+    ackDoc["co"] = "RLY";
+    ackDoc["de"] = de;
+    JsonObject pa = ackDoc.createNestedObject("pa");
+    pa["pin"] = pin;
+    pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "on" : "off";
+
+    String output;
+    serializeJson(ackDoc, output);
+    Serial.println("Sending ack: " + output); // Отладка
+    client.send(output);
+  }
 }
 
 void onEventsCallback(WebsocketsEvent event, String data)
 {
-    if (event == WebsocketsEvent::ConnectionOpened)
+  if (event == WebsocketsEvent::ConnectionOpened)
+  {
+    Serial.println("Connection opened");
+  }
+  else if (event == WebsocketsEvent::ConnectionClosed)
+  {
+    Serial.println("Connection closed");
+    if (wasConnected)
     {
-        Serial.println("Connection opened");
+      wasConnected = false;
+      isIdentified = false;
+      stopMotors();
     }
-    else if (event == WebsocketsEvent::ConnectionClosed)
-    {
-        Serial.println("Connection closed");
-        if (wasConnected)
-        {
-            wasConnected = false;
-            isIdentified = false;
-            stopMotors();
-        }
-    }
-    else if (event == WebsocketsEvent::GotPing)
-    {
-        client.pong();
-    }
+  }
+  else if (event == WebsocketsEvent::GotPing)
+  {
+    client.pong();
+  }
 }
 
 // Инициализация
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(1000);
   Serial.println("Starting ESP8266..."); // Отладка
 
   // Инициализация сервопривода
-  if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO) {
+  if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
+  {
     Serial.println("Error attaching servo");
-    while (1) delay(100);
+    while (1)
+      delay(100);
   }
   Servo1.setSpeed(60);
   Servo1.write(90);
@@ -341,7 +397,8 @@ void setup() {
   // Подключение к WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
@@ -369,38 +426,43 @@ void setup() {
 
 void loop()
 {
-    updateServoPosition();
+  updateServoPosition();
 
-    // Работа с WebSocket
-    if (!client.available())
+  // Работа с WebSocket
+  if (!client.available())
+  {
+    if (millis() - lastReconnectAttempt > 5000)
     {
-        if (millis() - lastReconnectAttempt > 5000)
-        {
-            lastReconnectAttempt = millis();
-            connectToServer();
-        }
+      lastReconnectAttempt = millis();
+      connectToServer();
     }
-    else
+  }
+  else
+  {
+    client.poll();
+
+    if (isIdentified)
     {
-        client.poll();
+      if (millis() - lastHeartbeatTime > 10000)
+      {
+        lastHeartbeatTime = millis();
+        sendLogMessage("Heartbeat - OK");
+        char relayStatus[64];
+        snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+                 digitalRead(button1) == LOW ? "on" : "off",
+                 digitalRead(button2) == LOW ? "on" : "off");
+        sendLogMessage(relayStatus);
+      }
 
-        if (isIdentified)
-        {
-            if (millis() - lastHeartbeatTime > 10000)
-            {
-                lastHeartbeatTime = millis();
-                sendLogMessage("Heartbeat - OK");
-            }
-
-            if (millis() - lastHeartbeat2Time > 2000)
-            {
-                stopMotors();
-            }
-        }
-        else if (millis() - lastReconnectAttempt > 3000)
-        {
-            lastReconnectAttempt = millis();
-            identifyDevice();
-        }
+      if (millis() - lastHeartbeat2Time > 2000)
+      {
+        stopMotors();
+      }
     }
+    else if (millis() - lastReconnectAttempt > 3000)
+    {
+      lastReconnectAttempt = millis();
+      identifyDevice();
+    }
+  }
 }
