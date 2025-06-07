@@ -157,6 +157,8 @@ void sendLogMessage(const char *me)
     doc["de"] = de;
     doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
     doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+    doc["sp1"] = Servo1.read(); // Угол первого сервопривода
+    doc["sp2"] = Servo2.read(); // Угол второго сервопривода
     String output;
     serializeJson(doc, output);
     client.send(output);
