@@ -47,6 +47,8 @@
 #include <ArduinoJson.h>
 #include "ServoEasing.hpp"
 
+const int analogPin = A0;
+
 // Motor pins
 #define enA D1
 #define in1 D2
@@ -149,20 +151,23 @@ void updateServoPosition()
 // Отправка логов
 void sendLogMessage(const char *me)
 {
-  if (client.available())
-  {
-    StaticJsonDocument<256> doc;
-    doc["ty"] = "log";
-    doc["me"] = me;
-    doc["de"] = de;
-    doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
-    doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
-    doc["sp1"] = Servo1.read(); // Угол первого сервопривода
-    doc["sp2"] = Servo2.read(); // Угол второго сервопривода
-    String output;
-    serializeJson(doc, output);
-    client.send(output);
-  }
+    if (client.available())
+    {
+        StaticJsonDocument<256> doc;
+        doc["ty"] = "log";
+        doc["me"] = me;
+        doc["de"] = de;
+        doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
+        doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+        doc["sp1"] = Servo1.read(); // Угол первого сервопривода
+        doc["sp2"] = Servo2.read(); // Угол второго сервопривода
+        int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
+        float inputVoltage = raw * 0.021888; // Преобразование в напряжение
+        doc["z"] = inputVoltage; // Добавляем inputVoltage как z
+        String output;
+        serializeJson(doc, output);
+        client.send(output);
+    }
 }
 
 // Подтверждение команды
