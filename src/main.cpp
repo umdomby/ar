@@ -104,7 +104,7 @@ void startServoMove(int targetPos, unsigned long duration)
     return;
 
   // Дополнительная проверка на допустимый диапазон (на всякий случай)
-  targetPos = constrain(targetPos, 0, 165);
+  targetPos = constrain(targetPos, 0, 180);
 
   servoStartPosition = Servo1.read();
   servoTargetPosition = targetPos;
@@ -121,7 +121,7 @@ void startServo2Move(int targetPos, unsigned long duration) {
     return;
 
   // Дополнительная проверка на допустимый диапазон
-  targetPos = constrain(targetPos, 0, 165);
+  targetPos = constrain(targetPos, 0, 180);
 
   servo2StartPosition = Servo2.read();
   servo2TargetPosition = targetPos;
@@ -299,10 +299,10 @@ void onMessageCallback(WebsocketsMessage message)
       an = 0;
       sendLogMessage("Warning: Servo angle clamped to 0");
     }
-    else if (an > 165)
+    else if (an > 180)
     {
-      an = 165;
-      sendLogMessage("Warning: Servo angle clamped to 165");
+      an = 180;
+      sendLogMessage("Warning: Servo angle clamped to 180");
     }
     if (an != Servo1.read())
     {
@@ -314,9 +314,9 @@ void onMessageCallback(WebsocketsMessage message)
     if (an < 0) {
       an = 0;
       sendLogMessage("Warning: Servo2 angle clamped to 0");
-    } else if (an > 165) {
-      an = 165;
-      sendLogMessage("Warning: Servo2 angle clamped to 165");
+    } else if (an > 180) {
+      an = 180;
+      sendLogMessage("Warning: Servo2 angle clamped to 180");
     }
     if (an != Servo2.read()) {
       startServo2Move(an, 500);
