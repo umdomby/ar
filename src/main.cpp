@@ -163,7 +163,9 @@ void sendLogMessage(const char *me)
         doc["sp2"] = Servo2.read(); // Угол второго сервопривода
         int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
         float inputVoltage = raw * 0.021888; // Преобразование в напряжение
-        doc["z"] = inputVoltage; // Добавляем inputVoltage как z
+        char voltageStr[8];
+        dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
+        doc["z"] = voltageStr; // Добавляем отформатированное значение как z
         String output;
         serializeJson(doc, output);
         client.send(output);
