@@ -311,16 +311,22 @@ void onMessageCallback(WebsocketsMessage message)
       startServoMove(an, 500);
       sendCommandAck("SSR");
     }
-  }else if (strcmp(co, "SSR2") == 0) { // Новый блок для второго сервопривода
+  }
+  else if (strcmp(co, "SSR2") == 0)
+  {
     int an = doc["pa"]["an"];
-    if (an < 0) {
+    if (an < 0)
+    {
       an = 0;
       sendLogMessage("Warning: Servo2 angle clamped to 0");
-    } else if (an > 180) {
+    }
+    else if (an > 180)
+    {
       an = 180;
       sendLogMessage("Warning: Servo2 angle clamped to 180");
     }
-    if (an != Servo2.read()) {
+    if (an != Servo2.read())
+    {
       startServo2Move(an, 500);
       sendCommandAck("SSR2");
     }
