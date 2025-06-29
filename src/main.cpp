@@ -188,7 +188,8 @@ void onMessageCallback(WebsocketsMessage message)
         sendLogMessage(relayStatus);
         return;
     }
-
+    
+    //control axis
     if (strcmp(co, "SSR") == 0)
     {
         int an = doc["pa"]["an"];
