@@ -4,6 +4,10 @@
 #include <ArduinoJson.h>
 #include "ServoEasing.hpp"
 
+unsigned long lastWiFiCheck = 0;
+unsigned long disconnectStartTime = 0;
+const unsigned long MAX_DISCONNECT_TIME = 20UL * 60UL * 60UL * 1000UL; // 10 часов в миллисекундах
+
 const int analogPin = A0;
 
 // Motor pins
@@ -19,8 +23,8 @@ const int analogPin = A0;
 #define button2 3  // Реле 2 на пине RX (GPIO3)
 
 // servo pins
-#define SERVO1_PIN D7
-#define SERVO2_PIN D8
+#define SERVO1_PIN D7 // ось Y rightStick
+#define SERVO2_PIN D8 // ось X leftStick
 ServoEasing Servo1;
 ServoEasing Servo2;
 
@@ -39,7 +43,8 @@ bool wasConnected = false;
 bool isIdentified = false;
 
 void sendCommandAck(const char *co, int sp = -1); // command → co, speed → sp
-
+void onMessageCallback(WebsocketsMessage message);
+void onEventsCallback(WebsocketsEvent event, String data);
 // Отправка логов
 void sendLogMessage(const char *me)
 {
@@ -120,24 +125,47 @@ void identifyDevice()
     }
 }
 
-void connectToServer()
-{
+void ensureWiFiConnected() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi disconnected, reconnecting...");
+        WiFi.disconnect();
+        WiFi.begin(ssid, password);
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\nWiFi reconnected");
+        } else {
+            Serial.println("\nWiFi reconnection failed");
+        }
+    }
+}
+
+void connectToServer() {
     Serial.println("Connecting to server...");
+    client.close(); // Закрываем старое соединение
+    client = WebsocketsClient(); // Создаем новый экземпляр клиента
+    client.onMessage(onMessageCallback);
+    client.onEvent(onEventsCallback);
     client.addHeader("Origin", "http://ardua.site");
     client.setInsecure();
 
-    if (client.connect(websocket_server))
-    {
+    if (client.connect(websocket_server)) {
         Serial.println("WebSocket connected!");
         wasConnected = true;
         isIdentified = false;
+        disconnectStartTime = 0; // Сбрасываем время отключения
         identifyDevice();
-    }
-    else
-    {
+    } else {
         Serial.println("WebSocket connection failed!");
         wasConnected = false;
         isIdentified = false;
+        if (disconnectStartTime == 0) {
+            disconnectStartTime = millis(); // Запоминаем время начала отключения
+        }
     }
 }
 
@@ -299,24 +327,20 @@ void onMessageCallback(WebsocketsMessage message)
     }
 }
 
-void onEventsCallback(WebsocketsEvent event, String data)
-{
-    if (event == WebsocketsEvent::ConnectionOpened)
-    {
+void onEventsCallback(WebsocketsEvent event, String data) {
+    if (event == WebsocketsEvent::ConnectionOpened) {
         Serial.println("Connection opened");
-    }
-    else if (event == WebsocketsEvent::ConnectionClosed)
-    {
+    } else if (event == WebsocketsEvent::ConnectionClosed) {
         Serial.println("Connection closed");
-        if (wasConnected)
-        {
+        if (wasConnected) {
             wasConnected = false;
             isIdentified = false;
             stopMotors();
         }
-    }
-    else if (event == WebsocketsEvent::GotPing)
-    {
+        if (disconnectStartTime == 0) {
+            disconnectStartTime = millis(); // Запоминаем время начала отключения
+        }
+    } else if (event == WebsocketsEvent::GotPing) {
         client.pong();
     }
 }
@@ -376,25 +400,30 @@ void setup()
     Serial.println("Motors and relays initialized");
 }
 
-void loop()
-{
+void loop() {
+    // Проверка WiFi каждые 30 секунд
+    if (millis() - lastWiFiCheck > 30000) {
+        lastWiFiCheck = millis();
+        ensureWiFiConnected();
+    }
+
     // Работа с WebSocket
-    if (!client.available())
-    {
-        if (millis() - lastReconnectAttempt > 5000)
-        {
+    if (!client.available()) {
+        if (millis() - lastReconnectAttempt > 5000) {
             lastReconnectAttempt = millis();
             connectToServer();
         }
-    }
-    else
-    {
+
+        // Проверка длительного отключения (10 часов)
+        if (disconnectStartTime > 0 && (millis() - disconnectStartTime > MAX_DISCONNECT_TIME)) {
+            Serial.println("No connection for 20 hours, restarting...");
+            ESP.restart(); // Программный перезапуск
+        }
+    } else {
         client.poll();
 
-        if (isIdentified)
-        {
-            if (millis() - lastHeartbeatTime > 10000)
-            {
+        if (isIdentified) {
+            if (millis() - lastHeartbeatTime > 10000) {
                 lastHeartbeatTime = millis();
                 sendLogMessage("Heartbeat - OK");
                 char relayStatus[64];
@@ -404,13 +433,10 @@ void loop()
                 sendLogMessage(relayStatus);
             }
 
-            if (millis() - lastHeartbeat2Time > 2000)
-            {
+            if (millis() - lastHeartbeat2Time > 2000) {
                 stopMotors();
             }
-        }
-        else if (millis() - lastReconnectAttempt > 3000)
-        {
+        } else if (millis() - lastReconnectAttempt > 3000) {
             lastReconnectAttempt = millis();
             identifyDevice();
         }
