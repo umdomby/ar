@@ -97,10 +97,10 @@ void stopMotors()
     digitalWrite(in2, LOW);
     digitalWrite(in3, LOW);
     digitalWrite(in4, LOW);
-    if (isIdentified)
-    {
-        sendLogMessage("Motors stopped");
-    }
+    // if (isIdentified)
+    // {
+    //     sendLogMessage("Motors stopped");
+    // }
 }
 
 void identifyDevice()
@@ -174,13 +174,15 @@ void onMessageCallback(WebsocketsMessage message)
 {
     StaticJsonDocument<192> doc;
     DeserializationError error = deserializeJson(doc, message.data());
+
     if (error)
     {
         Serial.print("JSON parse error: ");
         Serial.println(error.c_str());
         return;
     }
-
+    lastHeartbeat2Time = millis();
+    
     Serial.println("Received message: " + message.data()); // Отладка
 
     if (doc["ty"] == "sys" && doc["st"] == "con")
@@ -199,7 +201,7 @@ void onMessageCallback(WebsocketsMessage message)
         // Установить начальные углы сервоприводов
         Servo1.write(90);
         Servo2.write(90);
-        sendLogMessage("Servos initialized to 90 degrees");
+        //sendLogMessage("Servos initialized to 90 degrees");
         return;
     }
 
@@ -228,7 +230,7 @@ void onMessageCallback(WebsocketsMessage message)
             sendCommandAck("SSR");
             char logMsg[32];
             snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
-            sendLogMessage(logMsg);
+            //sendLogMessage(logMsg);
         }
     }
     else if (strcmp(co, "SSR2") == 0)
@@ -241,7 +243,7 @@ void onMessageCallback(WebsocketsMessage message)
             sendCommandAck("SSR2");
             char logMsg[32];
             snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
-            sendLogMessage(logMsg);
+            //sendLogMessage(logMsg);
         }
     }
     else if (strcmp(co, "MFA") == 0)
@@ -291,8 +293,8 @@ void onMessageCallback(WebsocketsMessage message)
     else if (strcmp(co, "HBT") == 0)
     {
         lastHeartbeat2Time = millis();
-        sendLogMessage("Heartbeat - OK");
-        return;
+        //sendLogMessage("Heartbeat - OK");
+        //return;
     }
     else if (strcmp(co, "RLY") == 0)
     {
@@ -414,7 +416,7 @@ void loop() {
             connectToServer();
         }
 
-        // Проверка длительного отключения (10 часов)
+        // Проверка длительного отключения (20 часов)
         if (disconnectStartTime > 0 && (millis() - disconnectStartTime > MAX_DISCONNECT_TIME)) {
             Serial.println("No connection for 20 hours, restarting...");
             ESP.restart(); // Программный перезапуск
@@ -423,17 +425,17 @@ void loop() {
         client.poll();
 
         if (isIdentified) {
-            if (millis() - lastHeartbeatTime > 10000) {
+            if (millis() - lastHeartbeatTime > 5000) {
                 lastHeartbeatTime = millis();
                 sendLogMessage("Heartbeat - OK");
                 char relayStatus[64];
                 snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
                          digitalRead(button1) == LOW ? "on" : "off",
                          digitalRead(button2) == LOW ? "on" : "off");
-                sendLogMessage(relayStatus);
+                //sendLogMessage(relayStatus);
             }
 
-            if (millis() - lastHeartbeat2Time > 2000) {
+            if (millis() - lastHeartbeat2Time > 700) {
                 stopMotors();
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
