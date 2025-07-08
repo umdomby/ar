@@ -19,8 +19,8 @@ const int analogPin = A0;
 #define enB D6
 
 // relay pins
-#define button1 D0
-#define button2 3  // Реле 2 на пине RX (GPIO3)
+#define button1 3
+#define button2 D0  // Реле 2 на пине RX (GPIO3)
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -38,6 +38,8 @@ const char *de = "4444444444444444"; // deviceId → de
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
 unsigned long lastHeartbeatTime = 0;
+unsigned long lastMillisAlarm = 0;
+unsigned long lastAnalogReadTime = 0;
 unsigned long lastHeartbeat2Time = 0;
 bool wasConnected = false;
 bool isIdentified = false;
@@ -201,7 +203,7 @@ void onMessageCallback(WebsocketsMessage message)
         // Установить начальные углы сервоприводов
         Servo1.write(90);
         Servo2.write(90);
-        //sendLogMessage("Servos initialized to 90 degrees");
+        sendLogMessage("Servos initialized to 90 degrees");
         return;
     }
 
@@ -218,9 +220,9 @@ void onMessageCallback(WebsocketsMessage message)
         sendLogMessage(relayStatus);
         return;
     }
-    
-    //control axis
-    if (strcmp(co, "SSR") == 0)
+
+    //control axisVB
+    if (strcmp(co, "SAR") == 0)
     {
         int an = doc["pa"]["an"];
         an = constrain(an, 0, 180); // Ограничение угла 0–180
@@ -233,7 +235,7 @@ void onMessageCallback(WebsocketsMessage message)
             //sendLogMessage(logMsg);
         }
     }
-    else if (strcmp(co, "SSR2") == 0)
+    else if (strcmp(co, "SAR2") == 0)
     {
         int an = doc["pa"]["an"];
         an = constrain(an, 0, 180); // Ограничение угла 0–180
@@ -244,6 +246,34 @@ void onMessageCallback(WebsocketsMessage message)
             char logMsg[32];
             snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
             //sendLogMessage(logMsg);
+        }
+    }
+    
+    //control axis
+    if (strcmp(co, "SSR") == 0)
+    {
+        int an = doc["pa"]["an"];
+        an = constrain(an, 0, 180); // Ограничение угла 0–180
+        if (an != Servo1.read())
+        {
+            Servo1.write(an);
+            sendCommandAck("SSR");
+            char logMsg[32];
+            snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
+            sendLogMessage(logMsg);
+        }
+    }
+    else if (strcmp(co, "SSR2") == 0)
+    {
+        int an = doc["pa"]["an"];
+        an = constrain(an, 0, 180); // Ограничение угла 0–180
+        if (an != Servo2.read())
+        {
+            Servo2.write(an);
+            sendCommandAck("SSR2");
+            char logMsg[32];
+            snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
+            sendLogMessage(logMsg);
         }
     }
     else if (strcmp(co, "MFA") == 0)
@@ -425,14 +455,29 @@ void loop() {
         client.poll();
 
         if (isIdentified) {
-            if (millis() - lastHeartbeatTime > 5000) {
+            
+            if(digitalRead(button2) == HIGH) {
+                if (millis() - lastAnalogReadTime > 300) {
+                    lastAnalogReadTime = millis();
+                    if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
+                        lastMillisAlarm = millis();
+                        // Serial.print("ALARM TRUE ");
+                        // Serial.print(analogRead(analogPin));
+                        // Serial.print(" ");
+                        // Serial.println(analogRead(button1));
+                        sendLogMessage("ALARM TRUE");
+                    }
+                }
+            }
+
+            if (millis() - lastHeartbeatTime > 15000) {
                 lastHeartbeatTime = millis();
                 sendLogMessage("Heartbeat - OK");
                 char relayStatus[64];
                 snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
                          digitalRead(button1) == LOW ? "on" : "off",
                          digitalRead(button2) == LOW ? "on" : "off");
-                //sendLogMessage(relayStatus);
+                sendLogMessage(relayStatus);
             }
 
             if (millis() - lastHeartbeat2Time > 700) {
