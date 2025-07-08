@@ -39,6 +39,8 @@ WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
 unsigned long lastHeartbeatTime = 0;
 unsigned long lastMillisAlarm = 0;
+unsigned long lastMillisAxisJoyX = 0;
+unsigned long lastMillisAxisJoyY = 0;
 unsigned long lastAnalogReadTime = 0;
 unsigned long lastHeartbeat2Time = 0;
 bool wasConnected = false;
@@ -211,16 +213,6 @@ void onMessageCallback(WebsocketsMessage message)
     if (!co)
         return;
 
-    if (strcmp(co, "GET_RELAYS") == 0)
-    {
-        char relayStatus[64];
-        snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                 digitalRead(button1) == LOW ? "on" : "off",
-                 digitalRead(button2) == LOW ? "on" : "off");
-        sendLogMessage(relayStatus);
-        return;
-    }
-
     //control axisVB
     if (strcmp(co, "SAR") == 0)
     {
@@ -256,33 +248,96 @@ void onMessageCallback(WebsocketsMessage message)
     //         //sendLogMessage(logMsg);
     //     }
     // }
-    
-    //control axis
-    else if (strcmp(co, "SSR") == 0)
+
+    else if (strcmp(co, "SPD") == 0)
     {
-        int an = doc["pa"]["an"];
-        an = constrain(an, 0, 180); // Ограничение угла 0–180
-        if (an != Servo1.read())
+        const char *mo = doc["pa"]["mo"];
+        int speed = doc["pa"]["sp"];
+        if (strcmp(mo, "A") == 0)
         {
-            Servo1.write(an);
-            sendCommandAck("SSR");
-            char logMsg[32];
-            snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
-            sendLogMessage(logMsg);
+            analogWrite(enA, speed);
+            sendCommandAck("SPD", speed);
+        }
+        else if (strcmp(mo, "B") == 0)
+        {
+            analogWrite(enB, speed);
+            sendCommandAck("SPD", speed);
         }
     }
-    else if (strcmp(co, "SSR2") == 0)
+    
+    //control axis
+    else if (strcmp(co, "SSY") == 0)
     {
         int an = doc["pa"]["an"];
         an = constrain(an, 0, 180); // Ограничение угла 0–180
-        if (an != Servo2.read())
-        {
+        // if (an != Servo1.read())
+        // {
+            Servo1.write(an);
+            //sendCommandAck("SSR");
+            //char logMsg[32];
+            //snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
+            // if(millis() - lastMillisAxisJoyY > 500){
+            //     lastMillisAxisJoyY = millis();
+            //     sendLogMessage("AxisY Joy");
+            // }
+            //sendLogMessage(logMsg);
+        //}
+    }
+    else if (strcmp(co, "SSX") == 0)
+    {
+        int an = doc["pa"]["an"];
+        an = constrain(an, 0, 180); // Ограничение угла 0–180
+        // if (an != Servo2.read())
+        // {
             Servo2.write(an);
-            sendCommandAck("SSR2");
-            char logMsg[32];
-            snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
-            sendLogMessage(logMsg);
+            //sendCommandAck("SSR2");
+            //char logMsg[32];
+            //snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
+
+            // if(millis() - lastMillisAxisJoyX > 500){
+            //     lastMillisAxisJoyX = millis();
+            //     sendLogMessage("AxisX Joy");
+            // }
+        //}
+    }
+    else if (strcmp(co, "SSA") == 0)
+    {
+        int an = doc["pa"]["an"];
+        int SSA = Servo1.read();
+        if(an > 0){
+            if(SSA + an < 180) {
+                Servo1.write(SSA + an);
+            }
+        }else{
+            if(SSA - an > 0) {
+                Servo1.write(SSA + an);
+            }
         }
+        sendLogMessage("SSA");
+    }
+    else if (strcmp(co, "SSB") == 0)
+    {
+        int an = doc["pa"]["an"];
+        int SSB = Servo2.read();
+        if(an > 0){
+            if(SSB + an < 180) {
+                Servo2.write(SSB + an);
+            }
+        }else{
+            if(SSB - an > 0) {
+                Servo2.write(SSB + an);
+            }
+        }
+        sendLogMessage("SSB");
+    }
+    else if (strcmp(co, "GET_RELAYS") == 0)
+    {
+        char relayStatus[64];
+        snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+                 digitalRead(button1) == LOW ? "on" : "off",
+                 digitalRead(button2) == LOW ? "on" : "off");
+        sendLogMessage(relayStatus);
+        return;
     }
     else if (strcmp(co, "MFA") == 0)
     {
@@ -307,21 +362,6 @@ void onMessageCallback(WebsocketsMessage message)
         digitalWrite(in3, LOW);
         digitalWrite(in4, HIGH);
         sendCommandAck("MRB");
-    }
-    else if (strcmp(co, "SPD") == 0)
-    {
-        const char *mo = doc["pa"]["mo"];
-        int speed = doc["pa"]["sp"];
-        if (strcmp(mo, "A") == 0)
-        {
-            analogWrite(enA, speed);
-            sendCommandAck("SPD", speed);
-        }
-        else if (strcmp(mo, "B") == 0)
-        {
-            analogWrite(enB, speed);
-            sendCommandAck("SPD", speed);
-        }
     }
     else if (strcmp(co, "STP") == 0)
     {
@@ -478,7 +518,7 @@ void loop() {
                 }
             }
 
-            if (millis() - lastHeartbeatTime > 15000) {
+            if (millis() - lastHeartbeatTime > 5000) {
                 lastHeartbeatTime = millis();
                 sendLogMessage("Heartbeat - OK");
                 char relayStatus[64];
