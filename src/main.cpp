@@ -225,32 +225,40 @@ void onMessageCallback(WebsocketsMessage message)
     if (strcmp(co, "SAR") == 0)
     {
         int an = doc["pa"]["an"];
+        int ak = doc["pa"]["ak"];
         an = constrain(an, 0, 180); // Ограничение угла 0–180
-        if (an != Servo1.read())
-        {
-            Servo1.write(an);
-            sendCommandAck("SSR");
-            char logMsg[32];
-            snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
-            //sendLogMessage(logMsg);
-        }
+        ak = constrain(ak, 0, 180); // Ограничение угла 0–180
+        bool servo1Changed = an != Servo1.read();
+        bool servo2Changed = ak != Servo2.read();
+        Servo1.write(an);
+        Servo2.write(ak);
+
+        // if (servo1Changed || servo2Changed)
+        // {
+        //     if (servo1Changed) Servo1.write(an);
+        //     if (servo2Changed) Servo2.write(ak);
+        //     //sendCommandAck("SAR");
+        //     char logMsg[64];
+        //     snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d, Servo2 set to %d degrees", an, ak);
+        //     //sendLogMessage(logMsg);
+        // }
     }
-    else if (strcmp(co, "SAR2") == 0)
-    {
-        int an = doc["pa"]["an"];
-        an = constrain(an, 0, 180); // Ограничение угла 0–180
-        if (an != Servo2.read())
-        {
-            Servo2.write(an);
-            sendCommandAck("SSR2");
-            char logMsg[32];
-            snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
-            //sendLogMessage(logMsg);
-        }
-    }
+    // else if (strcmp(co, "SAR2") == 0)
+    // {
+    //     int an = doc["pa"]["an"];
+    //     an = constrain(an, 0, 180); // Ограничение угла 0–180
+    //     if (an != Servo2.read())
+    //     {
+    //         Servo2.write(an);
+    //         sendCommandAck("SSR2");
+    //         char logMsg[32];
+    //         snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
+    //         //sendLogMessage(logMsg);
+    //     }
+    // }
     
     //control axis
-    if (strcmp(co, "SSR") == 0)
+    else if (strcmp(co, "SSR") == 0)
     {
         int an = doc["pa"]["an"];
         an = constrain(an, 0, 180); // Ограничение угла 0–180
@@ -455,7 +463,7 @@ void loop() {
         client.poll();
 
         if (isIdentified) {
-            
+
             if(digitalRead(button2) == HIGH) {
                 if (millis() - lastAnalogReadTime > 300) {
                     lastAnalogReadTime = millis();
