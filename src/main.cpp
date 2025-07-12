@@ -57,18 +57,19 @@ void sendLogMessage(const char *me)
         StaticJsonDocument<256> doc;
         doc["ty"] = "log";
         doc["me"] = me;
-        doc["de"] = de;
-        doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
-        doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
-        doc["sp1"] = Servo1.read(); // Угол первого сервопривода
-        doc["sp2"] = Servo2.read(); // Угол второго сервопривода
-        int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
-        float inputVoltage = raw * 0.021888; // Преобразование в напряжение
-        char voltageStr[8];
-        dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
-        doc["z"] = voltageStr; // Добавляем отформатированное значение как z
+        // doc["de"] = de;
+        // doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
+        // doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+        // doc["sp1"] = Servo1.read(); // Угол первого сервопривода
+        // doc["sp2"] = Servo2.read(); // Угол второго сервопривода
+        // int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
+        // float inputVoltage = raw * 0.021888; // Преобразование в напряжение
+        // char voltageStr[8];
+        // dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
+        // doc["z"] = voltageStr; // Добавляем отформатированное значение как z
         String output;
         serializeJson(doc, output);
+        Serial.println("sendLogMessage: " + output); // Отладка
         client.send(output);
     }
 }
@@ -256,12 +257,12 @@ void onMessageCallback(WebsocketsMessage message)
         if (strcmp(mo, "A") == 0)
         {
             analogWrite(enA, speed);
-            sendCommandAck("SPD", speed);
+            //sendCommandAck("SPD", speed);
         }
         else if (strcmp(mo, "B") == 0)
         {
             analogWrite(enB, speed);
-            sendCommandAck("SPD", speed);
+            //sendCommandAck("SPD", speed);
         }
     }
     
@@ -379,31 +380,41 @@ void onMessageCallback(WebsocketsMessage message)
         const char *pin = doc["pa"]["pin"];
         const char *state = doc["pa"]["state"];
 
+        // Проверка входных данных
+        if (!pin || !state) {
+            Serial.println("Ошибка: pin или state отсутствуют в JSON!");
+            return;
+        }
+        
+        // Установка состояния реле
         if (strcmp(pin, "D0") == 0)
         {
             digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);
             Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1)));
-            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 1 (D0) включено" : "Реле 1 (D0) выключено");
         }
         else if (strcmp(pin, "3") == 0)
         {
             digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
             Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2)));
-            sendLogMessage(strcmp(state, "on") == 0 ? "Реле 2 (3) включено" : "Реле 2 (3) выключено");
         }
 
+        // Формирование ответа
         StaticJsonDocument<256> ackDoc;
         ackDoc["ty"] = "ack";
         ackDoc["co"] = "RLY";
         ackDoc["de"] = de;
         JsonObject pa = ackDoc.createNestedObject("pa");
         pa["pin"] = pin;
-        pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "on" : "off";
+        pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "off" : "on";
 
         String output;
         serializeJson(ackDoc, output);
-        Serial.println("Sending ack: " + output);
-        client.send(output);
+        Serial.println("Отправка подтверждения на сервер: " + output); // Логирование JSON
+        if (!client.send(output)) {
+            Serial.println("Ошибка отправки подтверждения на сервер!");
+        } else {
+            Serial.println("Подтверждение успешно отправлено: " + output);
+        }
     }
 }
 
@@ -518,15 +529,15 @@ void loop() {
                 }
             }
 
-            if (millis() - lastHeartbeatTime > 5000) {
-                lastHeartbeatTime = millis();
-                sendLogMessage("Heartbeat - OK");
-                char relayStatus[64];
-                snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                         digitalRead(button1) == LOW ? "on" : "off",
-                         digitalRead(button2) == LOW ? "on" : "off");
-                sendLogMessage(relayStatus);
-            }
+            // if (millis() - lastHeartbeatTime > 5000) {
+            //     lastHeartbeatTime = millis();
+            //     sendLogMessage("HBT");
+            //     char relayStatus[64];
+            //     snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+            //              digitalRead(button1) == LOW ? "on" : "off",
+            //              digitalRead(button2) == LOW ? "on" : "off");
+            //     //sendLogMessage(relayStatus);
+            // }
 
             if (millis() - lastHeartbeat2Time > 700) {
                 stopMotors();
