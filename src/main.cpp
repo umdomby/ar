@@ -19,8 +19,8 @@ const int analogPin = A0;
 #define enB D6
 
 // relay pins
-#define button1 3
-#define button2 D0  // Реле 2 на пине RX (GPIO3)
+#define button1 3   // lightе RX GPIO3)
+#define button2 D0  // alarm + charger
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -57,16 +57,16 @@ void sendLogMessage(const char *me)
         StaticJsonDocument<256> doc;
         doc["ty"] = "log";
         doc["me"] = me;
-        // doc["de"] = de;
-        // doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
-        // doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
-        // doc["sp1"] = Servo1.read(); // Угол первого сервопривода
-        // doc["sp2"] = Servo2.read(); // Угол второго сервопривода
-        // int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
-        // float inputVoltage = raw * 0.021888; // Преобразование в напряжение
-        // char voltageStr[8];
-        // dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
-        // doc["z"] = voltageStr; // Добавляем отформатированное значение как z
+        doc["de"] = de;
+        doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
+        doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+        doc["sp1"] = Servo1.read(); // Угол первого сервопривода
+        doc["sp2"] = Servo2.read(); // Угол второго сервопривода
+        int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
+        float inputVoltage = raw * 0.021888; // Преобразование в напряжение
+        char voltageStr[8];
+        dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
+        doc["z"] = voltageStr; // Добавляем отформатированное значение как z
         String output;
         serializeJson(doc, output);
         Serial.println("sendLogMessage: " + output); // Отладка
@@ -257,13 +257,16 @@ void onMessageCallback(WebsocketsMessage message)
         if (strcmp(mo, "A") == 0)
         {
             analogWrite(enA, speed);
+            //sendLogMessage("SPDenA");
             //sendCommandAck("SPD", speed);
         }
         else if (strcmp(mo, "B") == 0)
         {
             analogWrite(enB, speed);
+            //sendLogMessage("SPDenB");
             //sendCommandAck("SPD", speed);
         }
+        sendLogMessage("SPD");
     }
     
     //control axis
@@ -275,13 +278,7 @@ void onMessageCallback(WebsocketsMessage message)
         // {
             Servo1.write(an);
             //sendCommandAck("SSR");
-            //char logMsg[32];
-            //snprintf(logMsg, sizeof(logMsg), "Servo1 set to %d degrees", an);
-            // if(millis() - lastMillisAxisJoyY > 500){
-            //     lastMillisAxisJoyY = millis();
-            //     sendLogMessage("AxisY Joy");
-            // }
-            //sendLogMessage(logMsg);
+            //sendLogMessage("SSY");
         //}
     }
     else if (strcmp(co, "SSX") == 0)
@@ -299,6 +296,7 @@ void onMessageCallback(WebsocketsMessage message)
             //     lastMillisAxisJoyX = millis();
             //     sendLogMessage("AxisX Joy");
             // }
+            //sendLogMessage("SSX");
         //}
     }
     else if (strcmp(co, "SSA") == 0)
@@ -314,7 +312,7 @@ void onMessageCallback(WebsocketsMessage message)
                 Servo1.write(SSA + an);
             }
         }
-        sendLogMessage("SSA");
+        //sendLogMessage("SSA");
     }
     else if (strcmp(co, "SSB") == 0)
     {
@@ -329,7 +327,7 @@ void onMessageCallback(WebsocketsMessage message)
                 Servo2.write(SSB + an);
             }
         }
-        sendLogMessage("SSB");
+        //sendLogMessage("SSB");
     }
     else if (strcmp(co, "GET_RELAYS") == 0)
     {
@@ -344,30 +342,30 @@ void onMessageCallback(WebsocketsMessage message)
     {
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
-        sendCommandAck("MFA");
+        //sendCommandAck("MFA");
     }
     else if (strcmp(co, "MRA") == 0)
     {
         digitalWrite(in1, LOW);
         digitalWrite(in2, HIGH);
-        sendCommandAck("MRA");
+        //sendCommandAck("MRA");
     }
     else if (strcmp(co, "MFB") == 0)
     {
         digitalWrite(in3, HIGH);
         digitalWrite(in4, LOW);
-        sendCommandAck("MFB");
+        //sendCommandAck("MFB");
     }
     else if (strcmp(co, "MRB") == 0)
     {
         digitalWrite(in3, LOW);
         digitalWrite(in4, HIGH);
-        sendCommandAck("MRB");
+        //sendCommandAck("MRB");
     }
     else if (strcmp(co, "STP") == 0)
     {
         stopMotors();
-        sendCommandAck("STP");
+        //sendCommandAck("STP");
     }
     else if (strcmp(co, "HBT") == 0)
     {
@@ -520,7 +518,7 @@ void loop() {
                     lastAnalogReadTime = millis();
                     if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
                         lastMillisAlarm = millis();
-                        // Serial.print("ALARM TRUE ");
+                        // Serial.println("ALARM TRUE 11111111111111111111111111111");
                         // Serial.print(analogRead(analogPin));
                         // Serial.print(" ");
                         // Serial.println(analogRead(button1));
@@ -529,15 +527,15 @@ void loop() {
                 }
             }
 
-            // if (millis() - lastHeartbeatTime > 5000) {
-            //     lastHeartbeatTime = millis();
-            //     sendLogMessage("HBT");
-            //     char relayStatus[64];
-            //     snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-            //              digitalRead(button1) == LOW ? "on" : "off",
-            //              digitalRead(button2) == LOW ? "on" : "off");
-            //     //sendLogMessage(relayStatus);
-            // }
+            if (millis() - lastHeartbeatTime > 5000) {
+                lastHeartbeatTime = millis();
+                sendLogMessage("HBT");
+                char relayStatus[64];
+                snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
+                         digitalRead(button1) == LOW ? "on" : "off",
+                         digitalRead(button2) == LOW ? "on" : "off");
+                //sendLogMessage(relayStatus);
+            }
 
             if (millis() - lastHeartbeat2Time > 700) {
                 stopMotors();
