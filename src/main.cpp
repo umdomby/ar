@@ -256,13 +256,21 @@ void onMessageCallback(WebsocketsMessage message)
         int speed = doc["pa"]["sp"];
         if (strcmp(mo, "A") == 0)
         {
-            analogWrite(enA, speed);
+            if(speed == 0){
+                digitalWrite(in1, LOW);
+                digitalWrite(in2, LOW);
+            }
+            //analogWrite(enA, speed);
             //sendLogMessage("SPDenA");
             //sendCommandAck("SPD", speed);
         }
         else if (strcmp(mo, "B") == 0)
         {
-            analogWrite(enB, speed);
+            if(speed == 0){
+                digitalWrite(in3, LOW);
+                digitalWrite(in4, LOW);
+            }
+            //analogWrite(enB, speed);
             //sendLogMessage("SPDenB");
             //sendCommandAck("SPD", speed);
         }
