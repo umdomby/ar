@@ -10,7 +10,7 @@ const unsigned long MAX_DISCONNECT_TIME = 20UL * 60UL * 60UL * 1000UL; // 10 Ñ‡Ð
 
 const int analogPin = A0;
 
-// Motor pins
+// Motor pins driver L298n
 #define enA D1
 #define in1 D2
 #define in2 D3
