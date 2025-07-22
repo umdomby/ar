@@ -102,8 +102,8 @@ void stopMotors()
     analogWrite(AIN2, 0);
     analogWrite(BIN1, 0); // Остановка мотора B
     analogWrite(BIN2, 0);
-    motorADirection = 0;  // Сбрасываем направление мотора A
-    motorBDirection = 0;  // Сбрасываем направление мотора B
+    //motorADirection = 0;  // Сбрасываем направление мотора A
+    //motorBDirection = 0;  // Сбрасываем направление мотора B
     // if (isIdentified)
     // {
     //     sendLogMessage("Motors stopped");
@@ -270,11 +270,12 @@ void onMessageCallback(WebsocketsMessage message)
                 analogWrite(AIN1, 0);
                 analogWrite(AIN2, speed);
                 sendLogMessage("Motor A speed set");
-            } else { // Мотор остановлен
-                analogWrite(AIN1, 0);
-                analogWrite(AIN2, 0);
-                sendLogMessage("Motor A stopped, no direction set");
-            }
+            } 
+            // else { // Мотор остановлен
+            //     analogWrite(AIN1, 0);
+            //     analogWrite(AIN2, 0);
+            //     //sendLogMessage("Motor A stopped, no direction set");
+            // }
             sendCommandAck("SPD", speed);
         }
         else if (strcmp(mo, "B") == 0)
@@ -287,14 +288,15 @@ void onMessageCallback(WebsocketsMessage message)
                 analogWrite(BIN1, 0);
                 analogWrite(BIN2, speed);
                 sendLogMessage("Motor B speed set");
-            } else { // Мотор остановлен
-                analogWrite(BIN1, 0);
-                analogWrite(BIN2, 0);
-                sendLogMessage("Motor B stopped, no direction set");
-            }
+            } 
+            // else { // Мотор остановлен
+            //     analogWrite(BIN1, 0);
+            //     analogWrite(BIN2, 0);
+            //     //sendLogMessage("Motor B stopped, no direction set");
+            // }
             sendCommandAck("SPD", speed);
         }
-        sendLogMessage("SPD");
+        //sendLogMessage("SPD");
     }
 
     //control axis
@@ -368,32 +370,32 @@ void onMessageCallback(WebsocketsMessage message)
     }
     else if (strcmp(co, "MFA") == 0)
     {
-        analogWrite(AIN1, 255); // Мотор A вперед
-        analogWrite(AIN2, 0);
+        // analogWrite(AIN1, 255); // Мотор A вперед
+        // analogWrite(AIN2, 0);
         motorADirection = 1;    // Устанавливаем направление вперед
         sendCommandAck("MFA");
         sendLogMessage("Motor A forward");
     }
     else if (strcmp(co, "MRA") == 0)
     {
-        analogWrite(AIN1, 0);   // Мотор A назад
-        analogWrite(AIN2, 255);
+        // analogWrite(AIN1, 0);   // Мотор A назад
+        // analogWrite(AIN2, 255);
         motorADirection = -1;   // Устанавливаем направление назад
         sendCommandAck("MRA");
         sendLogMessage("Motor A reverse");
     }
     else if (strcmp(co, "MFB") == 0)
     {
-        analogWrite(BIN1, 255); // Мотор B вперед
-        analogWrite(BIN2, 0);
+        // analogWrite(BIN1, 255); // Мотор B вперед
+        // analogWrite(BIN2, 0);
         motorBDirection = 1;    // Устанавливаем направление вперед
         sendCommandAck("MFB");
         sendLogMessage("Motor B forward");
     }
     else if (strcmp(co, "MRB") == 0)
     {
-        analogWrite(BIN1, 0);   // Мотор B назад
-        analogWrite(BIN2, 255);
+        // analogWrite(BIN1, 0);   // Мотор B назад
+        // analogWrite(BIN2, 255);
         motorBDirection = -1;   // Устанавливаем направление назад
         sendCommandAck("MRB");
         sendLogMessage("Motor B reverse");
