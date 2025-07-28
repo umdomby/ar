@@ -350,24 +350,28 @@ void onMessageCallback(WebsocketsMessage message)
     {
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
+        Serial.println("MFA");
         //sendCommandAck("MFA");
     }
     else if (strcmp(co, "MRA") == 0)
     {
         digitalWrite(in1, LOW);
         digitalWrite(in2, HIGH);
+        Serial.println("MRA");
         //sendCommandAck("MRA");
     }
     else if (strcmp(co, "MFB") == 0)
     {
         digitalWrite(in3, HIGH);
         digitalWrite(in4, LOW);
+        Serial.println("MFB");
         //sendCommandAck("MFB");
     }
     else if (strcmp(co, "MRB") == 0)
     {
         digitalWrite(in3, LOW);
         digitalWrite(in4, HIGH);
+        Serial.println("MRB");
         //sendCommandAck("MRB");
     }
     else if (strcmp(co, "STP") == 0)
