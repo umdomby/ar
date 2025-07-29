@@ -33,6 +33,7 @@ using namespace websockets;
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
 const char *websocket_server = "wss://ardua.site/wsar";
+
 const char *de = "5555555555555555"; // deviceId → de
 
 WebsocketsClient client;
