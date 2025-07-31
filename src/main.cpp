@@ -21,6 +21,7 @@ const int analogPin = A0;
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
+static bool b2State = false;
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -32,9 +33,10 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site/wsar";
+const char *websocket_server = "wss://ardua.site:444/wsar";
 
 const char *de = "5555555555555555"; // deviceId → de
+//const char *de = "4444444444444444"; // deviceId → de
 
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
@@ -374,27 +376,27 @@ void onMessageCallback(WebsocketsMessage message)
         //sendLogMessage("Heartbeat - OK");
         //return;
     }
-    else if (strcmp(co, "RLY") == 0)
+    if (strcmp(co, "RLY") == 0)
     {
         const char *pin = doc["pa"]["pin"];
         const char *state = doc["pa"]["state"];
 
-        // Проверка входных данных
         if (!pin || !state) {
             Serial.println("Ошибка: pin или state отсутствуют в JSON!");
             return;
         }
 
-        // Установка состояния реле
-        if (strcmp(pin, "D0") == 0)
+        if (strcmp(pin, "3") == 0)
         {
             digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);
-            Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1)));
+            Serial.println("Relay 1 (3) set to: " + String(digitalRead(button1)));
+
         }
-        else if (strcmp(pin, "3") == 0)
+        else if (strcmp(pin, "D0") == 0)
         {
             digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
-            Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2)));
+            Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
+            Serial.println("Relay 2 (D0) set to: " + String(state));
         }
 
         // Формирование ответа
@@ -404,11 +406,10 @@ void onMessageCallback(WebsocketsMessage message)
         ackDoc["de"] = de;
         JsonObject pa = ackDoc.createNestedObject("pa");
         pa["pin"] = pin;
-        pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "off" : "on";
-
+        pa["state"] = state; // Используем запрошенное состояние вместо digitalRead
         String output;
         serializeJson(ackDoc, output);
-        Serial.println("Отправка подтверждения на сервер: " + output); // Логирование JSON
+        Serial.println("Отправка подтверждения на сервер: " + output);
         if (!client.send(output)) {
             Serial.println("Ошибка отправки подтверждения на сервер!");
         } else {
@@ -484,8 +485,9 @@ void setup()
     pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
-    digitalWrite(button1, LOW);
-    digitalWrite(button2, LOW);
+    b2State = false;
+    digitalWrite(button1, HIGH);
+    digitalWrite(button2, HIGH);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
