@@ -21,7 +21,6 @@ const int analogPin = A0;
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
-static bool b2State = false;
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -33,7 +32,7 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site:444/wsar";
+const char *websocket_server = "wss://ardua.site/wsar";
 
 const char *de = "5555555555555555"; // deviceId → de
 //const char *de = "4444444444444444"; // deviceId → de
@@ -311,7 +310,7 @@ void onMessageCallback(WebsocketsMessage message)
                 Servo1.write(SSA + an);
             }
         }else{
-            if(SSA - an > 0) {
+            if(SSA - an > 70) {
                 Servo1.write(SSA + an);
             }
         }
@@ -485,7 +484,6 @@ void setup()
     pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
-    b2State = false;
     digitalWrite(button1, HIGH);
     digitalWrite(button2, HIGH);
     stopMotors();
