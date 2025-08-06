@@ -33,7 +33,7 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site/wsar";
+const char *websocket_server = "wss://ardua.site:444/wsar";
 
 const char *de = "9999999999999999"; // deviceId → de
 //const char *de = "4444444444444444"; // deviceId → de
@@ -101,10 +101,10 @@ void stopMotors()
 {
     analogWrite(enA, 0);
     analogWrite(enB, 0);
-    digitalWrite(in1, LOW);
-    digitalWrite(in2, LOW);
-    digitalWrite(in3, LOW);
-    digitalWrite(in4, LOW);
+    // digitalWrite(in1, LOW);
+    // digitalWrite(in2, LOW);
+    // digitalWrite(in3, LOW);
+    // digitalWrite(in4, LOW);
     // if (isIdentified)
     // {
     //     sendLogMessage("Motors stopped");
@@ -345,24 +345,28 @@ void onMessageCallback(WebsocketsMessage message)
     {
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
+        Serial.println("MFA  +");
         //sendCommandAck("MFA");
     }
     else if (strcmp(co, "MRA") == 0)
     {
         digitalWrite(in1, LOW);
         digitalWrite(in2, HIGH);
+        Serial.println("MRA +");
         //sendCommandAck("MRA");
     }
     else if (strcmp(co, "MFB") == 0)
     {
         digitalWrite(in3, HIGH);
         digitalWrite(in4, LOW);
+        Serial.println("MFB +");
         //sendCommandAck("MFB");
     }
     else if (strcmp(co, "MRB") == 0)
     {
         digitalWrite(in3, LOW);
         digitalWrite(in4, HIGH);
+        Serial.println("MRB +");
         //sendCommandAck("MRB");
     }
     else if (strcmp(co, "STP") == 0)
@@ -442,7 +446,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
     Serial.println("Starting ESP8266...");
-    Serial.end();
+    //Serial.end();
     // Инициализация первого сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
     {
