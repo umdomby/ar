@@ -21,6 +21,7 @@ const int analogPin = A0;
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
+//#define button3 1   // lightе TX GPIO1)
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -34,7 +35,7 @@ const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
 const char *websocket_server = "wss://ardua.site/wsar";
 
-const char *de = "5555555555555555"; // deviceId → de
+const char *de = "9999999999999999"; // deviceId → de
 //const char *de = "4444444444444444"; // deviceId → de
 
 WebsocketsClient client;
@@ -441,7 +442,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
     Serial.println("Starting ESP8266...");
-
+    Serial.end();
     // Инициализация первого сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
     {
@@ -484,8 +485,8 @@ void setup()
     pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
-    digitalWrite(button1, HIGH);
-    digitalWrite(button2, HIGH);
+    digitalWrite(button1, LOW);
+    digitalWrite(button2, LOW);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
