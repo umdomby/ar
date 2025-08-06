@@ -10,15 +10,18 @@ const unsigned long MAX_DISCONNECT_TIME = 20UL * 60UL * 60UL * 1000UL; // 10 ч�
 
 const int analogPin = A0;
 
-// Motor pins BTS7960
-#define AIN1 D1 // Пин для управления мотором A (прямое вращение)
-#define AIN2 D2 // Пин для управления мотором A (обратное вращение)
-#define BIN1 D3 // Пин для управления мотором B (прямое вращение)
-#define BIN2 D4 // Пин для управления мотором B (обратное вращение)
+// Motor pins driver BTS7960
+#define enA D1
+#define in1 D2
+#define in2 D3
+#define in3 D4
+#define in4 D5
+#define enB D6
 
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
+//#define button3 1   // lightе TX GPIO1)
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -30,9 +33,10 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-//const char *websocket_server = "wss://ardua.site/wsar";
 const char *websocket_server = "wss://ardua.site:444/wsar";
-const char *de = "4444444444444444"; // deviceId → de
+
+const char *de = "9999999999999999"; // deviceId → de
+//const char *de = "4444444444444444"; // deviceId → de
 
 WebsocketsClient client;
 unsigned long lastReconnectAttempt = 0;
@@ -44,9 +48,6 @@ unsigned long lastAnalogReadTime = 0;
 unsigned long lastHeartbeat2Time = 0;
 bool wasConnected = false;
 bool isIdentified = false;
-
-int motorADirection = 0; // 0: остановлен, 1: вперед, -1: назад
-int motorBDirection = 0; // 0: остановлен, 1: вперед, -1: назад
 
 void sendCommandAck(const char *co, int sp = -1); // command → co, speed → sp
 void onMessageCallback(WebsocketsMessage message);
@@ -98,12 +99,12 @@ void sendCommandAck(const char *co, int sp)
 
 void stopMotors()
 {
-    analogWrite(AIN1, 0); // Остановка мотора A
-    analogWrite(AIN2, 0);
-    analogWrite(BIN1, 0); // Остановка мотора B
-    analogWrite(BIN2, 0);
-    //motorADirection = 0;  // Сбрасываем направление мотора A
-    //motorBDirection = 0;  // Сбрасываем направление мотора B
+    analogWrite(enA, 0);
+    analogWrite(enB, 0);
+    // digitalWrite(in1, LOW);
+    // digitalWrite(in2, LOW);
+    // digitalWrite(in3, LOW);
+    // digitalWrite(in4, LOW);
     // if (isIdentified)
     // {
     //     sendLogMessage("Motors stopped");
@@ -255,48 +256,20 @@ void onMessageCallback(WebsocketsMessage message)
     else if (strcmp(co, "SPD") == 0)
     {
         const char *mo = doc["pa"]["mo"];
-        int speed = constrain(doc["pa"]["sp"], 0, 255); // Ограничиваем скорость 0–255
-        Serial.print("SPD command: motor=");
-        Serial.print(mo);
-        Serial.print(", speed=");
-        Serial.println(speed); // Отладка значения скорости
+        int speed = doc["pa"]["sp"];
         if (strcmp(mo, "A") == 0)
         {
-            if (motorADirection == 1) { // Прямое вращение
-                analogWrite(AIN1, speed);
-                analogWrite(AIN2, 0);
-                sendLogMessage("Motor A speed set");
-            } else if (motorADirection == -1) { // Обратное вращение
-                analogWrite(AIN1, 0);
-                analogWrite(AIN2, speed);
-                sendLogMessage("Motor A speed set");
-            } 
-            // else { // Мотор остановлен
-            //     analogWrite(AIN1, 0);
-            //     analogWrite(AIN2, 0);
-            //     //sendLogMessage("Motor A stopped, no direction set");
-            // }
-            sendCommandAck("SPD", speed);
+            analogWrite(enA, speed);
+            //sendLogMessage("SPDenA");
+            //sendCommandAck("SPD", speed);
         }
         else if (strcmp(mo, "B") == 0)
         {
-            if (motorBDirection == 1) { // Прямое вращение
-                analogWrite(BIN1, speed);
-                analogWrite(BIN2, 0);
-                sendLogMessage("Motor B speed set");
-            } else if (motorBDirection == -1) { // Обратное вращение
-                analogWrite(BIN1, 0);
-                analogWrite(BIN2, speed);
-                sendLogMessage("Motor B speed set");
-            } 
-            // else { // Мотор остановлен
-            //     analogWrite(BIN1, 0);
-            //     analogWrite(BIN2, 0);
-            //     //sendLogMessage("Motor B stopped, no direction set");
-            // }
-            sendCommandAck("SPD", speed);
+            analogWrite(enB, speed);
+            //sendLogMessage("SPDenB");
+            //sendCommandAck("SPD", speed);
         }
-        //sendLogMessage("SPD");
+        sendLogMessage("SPD");
     }
 
     //control axis
@@ -338,7 +311,7 @@ void onMessageCallback(WebsocketsMessage message)
                 Servo1.write(SSA + an);
             }
         }else{
-            if(SSA - an > 0) {
+            if(SSA - an > 70) {
                 Servo1.write(SSA + an);
             }
         }
@@ -370,35 +343,31 @@ void onMessageCallback(WebsocketsMessage message)
     }
     else if (strcmp(co, "MFA") == 0)
     {
-        // analogWrite(AIN1, 255); // Мотор A вперед
-        // analogWrite(AIN2, 0);
-        motorADirection = 1;    // Устанавливаем направление вперед
-        sendCommandAck("MFA");
-        sendLogMessage("Motor A forward");
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+        Serial.println("MFA  +");
+        //sendCommandAck("MFA");
     }
     else if (strcmp(co, "MRA") == 0)
     {
-        // analogWrite(AIN1, 0);   // Мотор A назад
-        // analogWrite(AIN2, 255);
-        motorADirection = -1;   // Устанавливаем направление назад
-        sendCommandAck("MRA");
-        sendLogMessage("Motor A reverse");
+        digitalWrite(in1, LOW);
+        digitalWrite(in2, HIGH);
+        Serial.println("MRA +");
+        //sendCommandAck("MRA");
     }
     else if (strcmp(co, "MFB") == 0)
     {
-        // analogWrite(BIN1, 255); // Мотор B вперед
-        // analogWrite(BIN2, 0);
-        motorBDirection = 1;    // Устанавливаем направление вперед
-        sendCommandAck("MFB");
-        sendLogMessage("Motor B forward");
+        digitalWrite(in3, HIGH);
+        digitalWrite(in4, LOW);
+        Serial.println("MFB +");
+        //sendCommandAck("MFB");
     }
     else if (strcmp(co, "MRB") == 0)
     {
-        // analogWrite(BIN1, 0);   // Мотор B назад
-        // analogWrite(BIN2, 255);
-        motorBDirection = -1;   // Устанавливаем направление назад
-        sendCommandAck("MRB");
-        sendLogMessage("Motor B reverse");
+        digitalWrite(in3, LOW);
+        digitalWrite(in4, HIGH);
+        Serial.println("MRB +");
+        //sendCommandAck("MRB");
     }
     else if (strcmp(co, "STP") == 0)
     {
@@ -411,27 +380,27 @@ void onMessageCallback(WebsocketsMessage message)
         //sendLogMessage("Heartbeat - OK");
         //return;
     }
-    else if (strcmp(co, "RLY") == 0)
+    if (strcmp(co, "RLY") == 0)
     {
         const char *pin = doc["pa"]["pin"];
         const char *state = doc["pa"]["state"];
 
-        // Проверка входных данных
         if (!pin || !state) {
             Serial.println("Ошибка: pin или state отсутствуют в JSON!");
             return;
         }
 
-        // Установка состояния реле
-        if (strcmp(pin, "D0") == 0)
+        if (strcmp(pin, "3") == 0)
         {
             digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);
-            Serial.println("Relay 1 (D0) set to: " + String(digitalRead(button1)));
+            Serial.println("Relay 1 (3) set to: " + String(digitalRead(button1)));
+
         }
-        else if (strcmp(pin, "3") == 0)
+        else if (strcmp(pin, "D0") == 0)
         {
             digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
-            Serial.println("Relay 2 (3) set to: " + String(digitalRead(button2)));
+            Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
+            Serial.println("Relay 2 (D0) set to: " + String(state));
         }
 
         // Формирование ответа
@@ -441,11 +410,10 @@ void onMessageCallback(WebsocketsMessage message)
         ackDoc["de"] = de;
         JsonObject pa = ackDoc.createNestedObject("pa");
         pa["pin"] = pin;
-        pa["state"] = digitalRead(strcmp(pin, "D0") == 0 ? button1 : button2) ? "off" : "on";
-
+        pa["state"] = state; // Используем запрошенное состояние вместо digitalRead
         String output;
         serializeJson(ackDoc, output);
-        Serial.println("Отправка подтверждения на сервер: " + output); // Логирование JSON
+        Serial.println("Отправка подтверждения на сервер: " + output);
         if (!client.send(output)) {
             Serial.println("Ошибка отправки подтверждения на сервер!");
         } else {
@@ -477,9 +445,8 @@ void setup()
 {
     Serial.begin(115200);
     delay(1000);
-    analogWriteFreq(1000);
     Serial.println("Starting ESP8266...");
-
+    //Serial.end();
     // Инициализация первого сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
     {
@@ -514,16 +481,12 @@ void setup()
     connectToServer();
 
     // Инициализация моторов и реле
-    // pinMode(enA, OUTPUT);
-    // pinMode(enB, OUTPUT);
-    // pinMode(in1, OUTPUT);
-    // pinMode(in2, OUTPUT);
-    // pinMode(in3, OUTPUT);
-    // pinMode(in4, OUTPUT);
-    pinMode(AIN1, OUTPUT);
-    pinMode(AIN2, OUTPUT);
-    pinMode(BIN1, OUTPUT);
-    pinMode(BIN2, OUTPUT);
+    pinMode(enA, OUTPUT);
+    pinMode(enB, OUTPUT);
+    pinMode(in1, OUTPUT);
+    pinMode(in2, OUTPUT);
+    pinMode(in3, OUTPUT);
+    pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
     digitalWrite(button1, LOW);
