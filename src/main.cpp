@@ -33,7 +33,7 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site/wsar";
+const char *websocket_server = "wss://ardua.site:444/wsar";
 
 const char *de = "9999999999999999"; // deviceId → de
 //const char *de = "4444444444444444"; // deviceId → de
@@ -217,8 +217,47 @@ void onMessageCallback(WebsocketsMessage message)
     if (!co)
         return;
 
+    if (strcmp(co, "STP") == 0){
+        stopMotors();
+        //sendCommandAck("STP");
+    }
+
+    else if (strcmp(co, "SPD") == 0) {
+        const char *mo = doc["pa"]["mo"];
+        int speed = doc["pa"]["sp"];
+        Serial.printf("SPD command received: motor=%s, speed=%d\n", mo, speed);
+        if (strcmp(mo, "A") == 0) {
+            analogWrite(enA, speed);
+            Serial.printf("Setting enA to %d\n", speed);
+        } else if (strcmp(mo, "B") == 0) {
+            analogWrite(enB, speed);
+            Serial.printf("Setting enB to %d\n", speed);
+        }
+        sendLogMessage("SPD");
+    }
+    else if (strcmp(co, "MFA") == 0) {
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+        Serial.println("MFA: in1=HIGH, in2=LOW");
+    }
+    else if (strcmp(co, "MRA") == 0) {
+        digitalWrite(in1, LOW);
+        digitalWrite(in2, HIGH);
+        Serial.println("MRA: in1=LOW, in2=HIGH");
+    }
+    else if (strcmp(co, "MFB") == 0) {
+        digitalWrite(in3, HIGH);
+        digitalWrite(in4, LOW);
+        Serial.println("MFB: in3=HIGH, in4=LOW");
+    }
+    else if (strcmp(co, "MRB") == 0) {
+        digitalWrite(in3, LOW);
+        digitalWrite(in4, HIGH);
+        Serial.println("MRB: in3=LOW, in4=HIGH");
+    }
+
     //control axisVB
-    if (strcmp(co, "SAR") == 0)
+    else if (strcmp(co, "SAR") == 0)
     {
         int an = doc["pa"]["an"];
         int ak = doc["pa"]["ak"];
@@ -252,25 +291,6 @@ void onMessageCallback(WebsocketsMessage message)
     //         //sendLogMessage(logMsg);
     //     }
     // }
-
-    else if (strcmp(co, "SPD") == 0)
-    {
-        const char *mo = doc["pa"]["mo"];
-        int speed = doc["pa"]["sp"];
-        if (strcmp(mo, "A") == 0)
-        {
-            analogWrite(enA, speed);
-            //sendLogMessage("SPDenA");
-            //sendCommandAck("SPD", speed);
-        }
-        else if (strcmp(mo, "B") == 0)
-        {
-            analogWrite(enB, speed);
-            //sendLogMessage("SPDenB");
-            //sendCommandAck("SPD", speed);
-        }
-        sendLogMessage("SPD");
-    }
 
     //control axis
     else if (strcmp(co, "SSY") == 0)
@@ -341,46 +361,13 @@ void onMessageCallback(WebsocketsMessage message)
         sendLogMessage(relayStatus);
         return;
     }
-    else if (strcmp(co, "MFA") == 0)
-    {
-        digitalWrite(in1, HIGH);
-        digitalWrite(in2, LOW);
-        Serial.println("MFA  +");
-        //sendCommandAck("MFA");
-    }
-    else if (strcmp(co, "MRA") == 0)
-    {
-        digitalWrite(in1, LOW);
-        digitalWrite(in2, HIGH);
-        Serial.println("MRA +");
-        //sendCommandAck("MRA");
-    }
-    else if (strcmp(co, "MFB") == 0)
-    {
-        digitalWrite(in3, HIGH);
-        digitalWrite(in4, LOW);
-        Serial.println("MFB +");
-        //sendCommandAck("MFB");
-    }
-    else if (strcmp(co, "MRB") == 0)
-    {
-        digitalWrite(in3, LOW);
-        digitalWrite(in4, HIGH);
-        Serial.println("MRB +");
-        //sendCommandAck("MRB");
-    }
-    else if (strcmp(co, "STP") == 0)
-    {
-        stopMotors();
-        //sendCommandAck("STP");
-    }
     else if (strcmp(co, "HBT") == 0)
     {
         lastHeartbeat2Time = millis();
         //sendLogMessage("Heartbeat - OK");
         //return;
     }
-    if (strcmp(co, "RLY") == 0)
+    else if (strcmp(co, "RLY") == 0)
     {
         const char *pin = doc["pa"]["pin"];
         const char *state = doc["pa"]["state"];
