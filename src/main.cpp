@@ -507,16 +507,22 @@ void loop() {
         if (isIdentified) {
 
             if(digitalRead(button2) == HIGH) {
-                if (millis() - lastAnalogReadTime > 300) {
+                if (millis() - lastAnalogReadTime > 100) {
                     lastAnalogReadTime = millis();
-                    if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
-                        lastMillisAlarm = millis();
-                        // Serial.println("ALARM TRUE 11111111111111111111111111111");
-                        // Serial.print(analogRead(analogPin));
-                        // Serial.print(" ");
-                        // Serial.println(analogRead(button1));
-                        sendLogMessage("ALARM TRUE");
-                    }
+
+                    int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
+                    int pwmValue = map(potValue, 0, 1023, 0, 255);
+
+                    analogWrite(enB, pwmValue); // Устанавливаем скорость для мотора B
+
+                    // if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
+                    //     lastMillisAlarm = millis();
+                    //     // Serial.println("ALARM TRUE 11111111111111111111111111111");
+                    //     // Serial.print(analogRead(analogPin));
+                    //     // Serial.print(" ");
+                    //     // Serial.println(analogRead(button1));
+                    //     sendLogMessage("ALARM TRUE");
+                    // }
                 }
             }
 
