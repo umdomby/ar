@@ -226,10 +226,10 @@ void onMessageCallback(WebsocketsMessage message)
         const char *mo = doc["pa"]["mo"];
         int speed = doc["pa"]["sp"];
         Serial.printf("SPD command received: motor=%s, speed=%d\n", mo, speed);
-        if (strcmp(mo, "A") == 0) {
+        if (digitalRead(button2) == LOW && strcmp(mo, "A") == 0) {
             analogWrite(enA, speed);
             Serial.printf("Setting enA to %d\n", speed);
-        } else if (strcmp(mo, "B") == 0) {
+        } else if(digitalRead(button2) == LOW && strcmp(mo, "B") == 0) { 
             analogWrite(enB, speed);
             Serial.printf("Setting enB to %d\n", speed);
         }
@@ -331,7 +331,7 @@ void onMessageCallback(WebsocketsMessage message)
                 Servo1.write(SSA + an);
             }
         }else{
-            if(SSA - an > 70) {
+            if(SSA - an > 0) {
                 Servo1.write(SSA + an);
             }
         }
@@ -385,6 +385,7 @@ void onMessageCallback(WebsocketsMessage message)
         }
         else if (strcmp(pin, "D0") == 0)
         {
+            stopMotors();
             digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
             Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
             Serial.println("Relay 2 (D0) set to: " + String(state));
@@ -513,8 +514,11 @@ void loop() {
                     int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
                     int pwmValue = map(potValue, 0, 1023, 0, 255);
 
+                    // digitalWrite(in3, HIGH);
+                    // digitalWrite(in4, LOW);
                     analogWrite(enB, pwmValue); // Устанавливаем скорость для мотора B
-
+                    Serial.println(potValue);
+                    
                     // if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
                     //     lastMillisAlarm = millis();
                     //     // Serial.println("ALARM TRUE 11111111111111111111111111111");
@@ -536,7 +540,7 @@ void loop() {
                 //sendLogMessage(relayStatus);
             }
 
-            if (millis() - lastHeartbeat2Time > 700) {
+            if (millis() - lastHeartbeat2Time > 700 && digitalRead(button2) == LOW) {
                 stopMotors();
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
