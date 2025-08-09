@@ -21,7 +21,7 @@ const int analogPin = A0;
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
-//#define button3 1   // lightе TX GPIO1)
+#define button3Rob 1   // lightе TX GPIO1)
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -434,7 +434,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
     Serial.println("Starting ESP8266...");
-    //Serial.end();
+    Serial.end();
     // Инициализация первого сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
     {
@@ -479,6 +479,7 @@ void setup()
     pinMode(button2, OUTPUT);
     digitalWrite(button1, HIGH);
     digitalWrite(button2, HIGH);
+    pinMode(button3Rob, INPUT);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
@@ -506,11 +507,17 @@ void loop() {
         client.poll();
 
         if (isIdentified) {
+            if (millis() - lastAnalogReadTime > 100) {
+                if (digitalRead(button3Rob) == HIGH) {
+                    digitalWrite(button1, LOW);
+                } else {
+                    digitalWrite(button1, HIGH);
+                }
 
-            if(digitalRead(button2) == LOW) {
-                if (millis() - lastAnalogReadTime > 100) {
+                if(digitalRead(button2) == LOW) {
+                
                     lastAnalogReadTime = millis();
-
+                    digitalRead(button3Rob);
                     int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
                     int pwmValue = map(potValue, 0, 1023, 0, 255);
 
