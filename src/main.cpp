@@ -61,8 +61,8 @@ void sendLogMessage(const char *me)
         doc["ty"] = "log";
         doc["me"] = me;
         doc["de"] = de;
-        doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
-        doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+        doc["b1"] = digitalRead(button1) == LOW ? "off" : "on"; // Состояние реле 1
+        doc["b2"] = digitalRead(button2) == LOW ? "off" : "on"; // Состояние реле 2
         doc["sp1"] = Servo1.read(); // Угол первого сервопривода
         doc["sp2"] = Servo2.read(); // Угол второго сервопривода
         int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
@@ -202,8 +202,8 @@ void onMessageCallback(WebsocketsMessage message)
         // Отправка состояния реле после идентификации
         char relayStatus[64];
         snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                 digitalRead(button1) == LOW ? "on" : "off",
-                 digitalRead(button2) == LOW ? "on" : "off");
+                 digitalRead(button1) == LOW ? "off" : "on",
+                 digitalRead(button2) == LOW ? "off" : "on");
         sendLogMessage(relayStatus);
 
         // Установить начальные углы сервоприводов
@@ -226,10 +226,10 @@ void onMessageCallback(WebsocketsMessage message)
         const char *mo = doc["pa"]["mo"];
         int speed = doc["pa"]["sp"];
         Serial.printf("SPD command received: motor=%s, speed=%d\n", mo, speed);
-        if (digitalRead(button2) == LOW && strcmp(mo, "A") == 0) {
-            analogWrite(enA, speed);
+        if (digitalRead(button2) == HIGH && strcmp(mo, "A") == 0) {
+            analogWrite(enA, speed / 1.5);
             Serial.printf("Setting enA to %d\n", speed);
-        } else if(digitalRead(button2) == LOW && strcmp(mo, "B") == 0) { 
+        } else if(digitalRead(button2) == HIGH && strcmp(mo, "B") == 0) { 
             analogWrite(enB, speed);
             Serial.printf("Setting enB to %d\n", speed);
         }
@@ -356,8 +356,8 @@ void onMessageCallback(WebsocketsMessage message)
     {
         char relayStatus[64];
         snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                 digitalRead(button1) == LOW ? "on" : "off",
-                 digitalRead(button2) == LOW ? "on" : "off");
+                 digitalRead(button1) == LOW ? "off" : "on",
+                 digitalRead(button2) == LOW ? "off" : "on");
         sendLogMessage(relayStatus);
         return;
     }
@@ -379,14 +379,14 @@ void onMessageCallback(WebsocketsMessage message)
 
         if (strcmp(pin, "3") == 0)
         {
-            digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);
+            digitalWrite(button1, strcmp(state, "on") == 0 ? HIGH : LOW);
             Serial.println("Relay 1 (3) set to: " + String(digitalRead(button1)));
 
         }
         else if (strcmp(pin, "D0") == 0)
         {
             stopMotors();
-            digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
+            digitalWrite(button2, strcmp(state, "on") == 0 ? HIGH : LOW);
             Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
             Serial.println("Relay 2 (D0) set to: " + String(state));
         }
@@ -477,8 +477,8 @@ void setup()
     pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
-    digitalWrite(button1, LOW);
-    digitalWrite(button2, LOW);
+    digitalWrite(button1, HIGH);
+    digitalWrite(button2, HIGH);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
@@ -507,7 +507,7 @@ void loop() {
 
         if (isIdentified) {
 
-            if(digitalRead(button2) == HIGH) {
+            if(digitalRead(button2) == LOW) {
                 if (millis() - lastAnalogReadTime > 100) {
                     lastAnalogReadTime = millis();
 
@@ -535,12 +535,12 @@ void loop() {
                 sendLogMessage("HBT");
                 char relayStatus[64];
                 snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                         digitalRead(button1) == LOW ? "on" : "off",
-                         digitalRead(button2) == LOW ? "on" : "off");
+                         digitalRead(button1) == LOW ? "off" : "on",
+                         digitalRead(button2) == LOW ? "off" : "on");
                 //sendLogMessage(relayStatus);
             }
 
-            if (millis() - lastHeartbeat2Time > 700 && digitalRead(button2) == LOW) {
+            if (millis() - lastHeartbeat2Time > 700 && digitalRead(button2) == HIGH) {
                 stopMotors();
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
