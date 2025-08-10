@@ -35,6 +35,9 @@ const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
 const char *websocket_server = "wss://ardua.site:444/wsar";
 
+String alarm = "off"; 
+boolean alarmMotion = false;
+
 const char *de = "9999999999999999"; // deviceId → de
 //const char *de = "4444444444444444"; // deviceId → de
 
@@ -70,10 +73,14 @@ void sendLogMessage(const char *me)
         char voltageStr[8];
         dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
         doc["z"] = voltageStr; // Добавляем отформатированное значение как z
+        doc["r"]="Dionis-Moto";
+        doc["a"]= alarm;
+        doc["m"]= alarmMotion;
         String output;
         serializeJson(doc, output);
         Serial.println("sendLogMessage: " + output); // Отладка
         client.send(output);
+        alarmMotion = false;
     }
 }
 
@@ -226,10 +233,11 @@ void onMessageCallback(WebsocketsMessage message)
         const char *mo = doc["pa"]["mo"];
         int speed = doc["pa"]["sp"];
         Serial.printf("SPD command received: motor=%s, speed=%d\n", mo, speed);
-        if (digitalRead(button2) == HIGH && strcmp(mo, "A") == 0) {
-            analogWrite(enA, speed / 1.5);
+        //digitalRead(button2) == HIGH && - close joy
+        if (strcmp(mo, "A") == 0) {
+            analogWrite(enA, speed);
             Serial.printf("Setting enA to %d\n", speed);
-        } else if(digitalRead(button2) == HIGH && strcmp(mo, "B") == 0) { 
+        } else if(strcmp(mo, "B") == 0) { 
             analogWrite(enB, speed);
             Serial.printf("Setting enB to %d\n", speed);
         }
@@ -408,6 +416,33 @@ void onMessageCallback(WebsocketsMessage message)
             Serial.println("Подтверждение успешно отправлено: " + output);
         }
     }
+
+    else if (strcmp(co, "ALARM") == 0)
+    {
+        const char *state = doc["pa"]["state"];
+
+        if (!state) {
+            Serial.println("Ошибка: pin или state отсутствуют в JSON!");
+            return;
+        }
+
+        alarm = state;
+        // Формирование ответа
+        StaticJsonDocument<256> ackDoc;
+        ackDoc["ty"] = "ack";
+        ackDoc["co"] = "ALARM";
+        ackDoc["de"] = de;
+        JsonObject pa = ackDoc.createNestedObject("pa");
+        pa["state"] = alarm;
+        String output;
+        serializeJson(ackDoc, output);
+        Serial.println("Отправка подтверждения на сервер: " + output);
+        if (!client.send(output)) {
+            Serial.println("Ошибка отправки подтверждения на сервер!");
+        } else {
+            Serial.println("Подтверждение успешно отправлено: " + output);
+        }
+    }
 }
 
 void onEventsCallback(WebsocketsEvent event, String data) {
@@ -479,7 +514,10 @@ void setup()
     pinMode(button2, OUTPUT);
     digitalWrite(button1, HIGH);
     digitalWrite(button2, HIGH);
-    pinMode(button3Rob, INPUT);
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    digitalWrite(in3, HIGH);
+    digitalWrite(in4, LOW);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
@@ -508,11 +546,16 @@ void loop() {
 
         if (isIdentified) {
             if (millis() - lastAnalogReadTime > 100) {
-                if (digitalRead(button3Rob) == HIGH) {
-                    digitalWrite(button1, LOW);
-                } else {
-                    digitalWrite(button1, HIGH);
-                }
+
+                // if(alarm == "on" && digitalRead(button3Rob) == LOW){
+                //     digitalWrite(button2, LOW);
+                // }
+
+                // if (digitalRead(button3Rob) == LOW) {
+                //     digitalWrite(button2, LOW);
+                // } else {
+                //     digitalWrite(button2, HIGH);
+                // }
 
                 if(digitalRead(button2) == LOW) {
                 
@@ -520,21 +563,28 @@ void loop() {
                     digitalRead(button3Rob);
                     int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
                     int pwmValue = map(potValue, 0, 1023, 0, 255);
+                    if(pwmValue > 1){
+                        lastHeartbeat2Time = millis();
+                    }
 
                     // digitalWrite(in3, HIGH);
                     // digitalWrite(in4, LOW);
                     analogWrite(enB, pwmValue); // Устанавливаем скорость для мотора B
                     Serial.println(potValue);
-                    
-                    // if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
-                    //     lastMillisAlarm = millis();
-                    //     // Serial.println("ALARM TRUE 11111111111111111111111111111");
-                    //     // Serial.print(analogRead(analogPin));
-                    //     // Serial.print(" ");
-                    //     // Serial.println(analogRead(button1));
-                    //     sendLogMessage("ALARM TRUE");
-                    // }
+                    //digitalRead(button3Rob) == LOW  && digitalRead(button1) && analogRead(analogPin) < 50 Для кнопки оповещения
+
                 }
+            }
+
+            if(millis() - lastMillisAlarm > 5000 && digitalRead(button3Rob) == LOW && alarm == "on" ){
+                lastMillisAlarm = millis();
+                alarmMotion = true;
+                // Serial.println("ALARM TRUE 11111111111111111111111111111");
+                // Serial.print(analogRead(analogPin));
+                // Serial.print(" ");
+                // Serial.println(analogRead(button1));
+                stopMotors();
+                sendLogMessage("ALARM TRUE");
             }
 
             if (millis() - lastHeartbeatTime > 5000) {
@@ -547,7 +597,7 @@ void loop() {
                 //sendLogMessage(relayStatus);
             }
 
-            if (millis() - lastHeartbeat2Time > 700 && digitalRead(button2) == HIGH) {
+            if (millis() - lastHeartbeat2Time > 700) {
                 stopMotors();
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
