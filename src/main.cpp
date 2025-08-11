@@ -31,9 +31,10 @@ ServoEasing Servo2;
 
 using namespace websockets;
 
-const char *ssid = "Robolab124";
+//const char *ssid = "Robolab124";
+const char *ssid = "p8";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site:444/wsar";
+const char *websocket_server = "wss://ardua.site/wsar";
 
 String alarm = "off"; 
 boolean alarmMotion = false;
