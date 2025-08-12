@@ -1,37 +1,15 @@
 #include <Arduino.h>
 #include "ServoEasing.hpp"
 
-ServoEasing myservo;  // Create servo object
-int pos = 0;          // Variable to store the servo position
-const int servoPin = D1;  // Servo connected to pin D1
+ServoEasing myservo;  // Создаём объект сервопривода
+const int servoPin = D1;  // Сервопривод подключён к пину D1
 
 void setup() {
-  myservo.attach(servoPin);  // Attach servo to pin D1
-  myservo.write(0);        // Initialize servo at 0 degrees
+  myservo.attach(servoPin);  // Подключаем сервопривод к пину D1
+  myservo.write(90);        // Устанавливаем сервопривод в 90 градусов
+  delay(1000);             // Задержка 1 секунда для стабилизации
 }
 
 void loop() {
-  // Slow rotation to 180 degrees
-  for (pos = 0; pos <= 180; pos += 1) {
-    myservo.write(pos);
-    delay(15);  // Slow movement: 15ms delay per step
-  }
-  delay(2000);  // 2-second delay
-
-  // Slow rotation back to 0 degrees
-  for (pos = 180; pos >= 0; pos -= 1) {
-    myservo.write(pos);
-    delay(15);  // Slow movement: 15ms delay per step
-  }
-  delay(2000);  // 2-second delay
-
-  // Fast rotation to +180 degrees
-  myservo.write(180);
-  delay(500);  // Fast movement: minimal delay
-  delay(2000);  // 2-second delay
-
-  // Fast rotation to -180 (0 degrees)
-  myservo.write(0);
-  delay(500);  // Fast movement: minimal delay
-  delay(2000);  // 2-second delay
+  // Пустой цикл, сервопривод остаётся в 90 градусах
 }
