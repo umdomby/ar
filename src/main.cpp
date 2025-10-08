@@ -25,9 +25,9 @@ const int analogPin = A0;
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
-#define SERVO2_PIN D8 // ось X leftStick
+//#define SERVO2_PIN D8 // ось X leftStick
 ServoEasing Servo1;
-ServoEasing Servo2;
+//ServoEasing Servo2;
 
 using namespace websockets;
 
@@ -64,7 +64,7 @@ void sendLogMessage(const char *me)
         doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
         doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
         doc["sp1"] = Servo1.read(); // Угол первого сервопривода
-        doc["sp2"] = Servo2.read(); // Угол второго сервопривода
+        //doc["sp2"] = Servo2.read(); // Угол второго сервопривода
         int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
         float inputVoltage = raw * 0.021888; // Преобразование в напряжение
         char voltageStr[8];
@@ -208,7 +208,7 @@ void onMessageCallback(WebsocketsMessage message)
 
         // Установить начальные углы сервоприводов
         Servo1.write(90);
-        Servo2.write(90);
+        //Servo2.write(90);
         sendLogMessage("Servos initialized to 90 degrees");
         return;
     }
@@ -264,9 +264,9 @@ void onMessageCallback(WebsocketsMessage message)
         an = constrain(an, 0, 180); // Ограничение угла 0–180
         ak = constrain(ak, 0, 180); // Ограничение угла 0–180
         bool servo1Changed = an != Servo1.read();
-        bool servo2Changed = ak != Servo2.read();
+        //bool servo2Changed = ak != Servo2.read();
         Servo1.write(an);
-        Servo2.write(ak);
+        //Servo2.write(ak);
 
         // if (servo1Changed || servo2Changed)
         // {
@@ -304,24 +304,24 @@ void onMessageCallback(WebsocketsMessage message)
             //sendLogMessage("SSY");
         //}
     }
-    else if (strcmp(co, "SSX") == 0)
-    {
-        int an = doc["pa"]["an"];
-        an = constrain(an, 0, 180); // Ограничение угла 0–180
-        // if (an != Servo2.read())
-        // {
-            Servo2.write(an);
-            //sendCommandAck("SSR2");
-            //char logMsg[32];
-            //snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
+    // else if (strcmp(co, "SSX") == 0)
+    // {
+    //     int an = doc["pa"]["an"];
+    //     an = constrain(an, 0, 180); // Ограничение угла 0–180
+    //     // if (an != Servo2.read())
+    //     // {
+    //         Servo2.write(an);
+    //         //sendCommandAck("SSR2");
+    //         //char logMsg[32];
+    //         //snprintf(logMsg, sizeof(logMsg), "Servo2 set to %d degrees", an);
 
-            // if(millis() - lastMillisAxisJoyX > 500){
-            //     lastMillisAxisJoyX = millis();
-            //     sendLogMessage("AxisX Joy");
-            // }
-            //sendLogMessage("SSX");
-        //}
-    }
+    //         // if(millis() - lastMillisAxisJoyX > 500){
+    //         //     lastMillisAxisJoyX = millis();
+    //         //     sendLogMessage("AxisX Joy");
+    //         // }
+    //         //sendLogMessage("SSX");
+    //     //}
+    // }
     else if (strcmp(co, "SSA") == 0)
     {
         int an = doc["pa"]["an"];
@@ -337,21 +337,21 @@ void onMessageCallback(WebsocketsMessage message)
         }
         //sendLogMessage("SSA");
     }
-    else if (strcmp(co, "SSB") == 0)
-    {
-        int an = doc["pa"]["an"];
-        int SSB = Servo2.read();
-        if(an > 0){
-            if(SSB + an < 180) {
-                Servo2.write(SSB + an);
-            }
-        }else{
-            if(SSB - an > 0) {
-                Servo2.write(SSB + an);
-            }
-        }
-        //sendLogMessage("SSB");
-    }
+    // else if (strcmp(co, "SSB") == 0)
+    // {
+    //     int an = doc["pa"]["an"];
+    //     int SSB = Servo2.read();
+    //     if(an > 0){
+    //         if(SSB + an < 180) {
+    //             Servo2.write(SSB + an);
+    //         }
+    //     }else{
+    //         if(SSB - an > 0) {
+    //             Servo2.write(SSB + an);
+    //         }
+    //     }
+    //     //sendLogMessage("SSB");
+    // }
     else if (strcmp(co, "GET_RELAYS") == 0)
     {
         char relayStatus[64];
@@ -444,13 +444,13 @@ void setup()
     Servo1.write(90);
 
     // Инициализация второго сервопривода
-    if (Servo2.attach(SERVO2_PIN, 90) == INVALID_SERVO)
-    {
-        Serial.println("Error attaching servo2");
-        while (1)
-            delay(100);
-    }
-    Servo2.write(90);
+    // if (Servo2.attach(SERVO2_PIN, 90) == INVALID_SERVO)
+    // {
+    //     Serial.println("Error attaching servo2");
+    //     while (1)
+    //         delay(100);
+    // }
+    // Servo2.write(90);
 
     // Подключение к WiFi
     WiFi.begin(ssid, password);
