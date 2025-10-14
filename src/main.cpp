@@ -65,7 +65,7 @@ void sendLogMessage(const char *me)
         doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
         doc["sp1"] = Servo1.read(); // Угол первого сервопривода
         doc["sp2"] = Servo2.read(); // Угол второго сервопривода
-        doc["r"] = "Car 1 Servo";
+        doc["mo"] = "Car 1 Servo";
         int raw = analogRead(analogPin); // Чтение с A0 (0–1023)
         float inputVoltage = raw * 0.021888; // Преобразование в напряжение
         char voltageStr[8];
