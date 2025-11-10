@@ -21,7 +21,7 @@ const int analogPin = A0;
 // relay pins
 #define button1 3   // lightе RX GPIO3)
 #define button2 D0  // alarm + charger
-//#define button3 1   // lightе TX GPIO1)
+#define button3Rob 1   // lightе TX GPIO1)
 
 // servo pins
 #define SERVO1_PIN D7 // ось Y rightStick
@@ -30,6 +30,9 @@ ServoEasing Servo1;
 ServoEasing Servo2;
 
 using namespace websockets;
+
+String alarm = "off";
+boolean alarmMotion = false;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
@@ -61,8 +64,8 @@ void sendLogMessage(const char *me)
         doc["ty"] = "log";
         doc["me"] = me;
         doc["de"] = de;
-        doc["b1"] = digitalRead(button1) == LOW ? "on" : "off"; // Состояние реле 1
-        doc["b2"] = digitalRead(button2) == LOW ? "on" : "off"; // Состояние реле 2
+        doc["b1"] = digitalRead(button1) == LOW ? "off" : "on"; // Состояние реле 1
+        doc["b2"] = digitalRead(button2) == LOW ? "off" : "on"; // Состояние реле 2
         doc["sp1"] = Servo1.read(); // Угол первого сервопривода
         doc["sp2"] = Servo2.read(); // Угол второго сервопривода
         doc["mo"] = "Car 1 Servo";
@@ -71,10 +74,14 @@ void sendLogMessage(const char *me)
         char voltageStr[8];
         dtostrf(inputVoltage, 5, 2, voltageStr); // Форматируем в строку с 2 знаками после запятой
         doc["z"] = voltageStr; // Добавляем отформатированное значение как z
+        doc["r"]="Car 1 Alarm";
+        doc["a"]= alarm;
+        doc["m"]= alarmMotion;
         String output;
         serializeJson(doc, output);
         Serial.println("sendLogMessage: " + output); // Отладка
         client.send(output);
+        alarmMotion = false;
     }
 }
 
@@ -203,8 +210,8 @@ void onMessageCallback(WebsocketsMessage message)
         // Отправка состояния реле после идентификации
         char relayStatus[64];
         snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                 digitalRead(button1) == LOW ? "on" : "off",
-                 digitalRead(button2) == LOW ? "on" : "off");
+                 digitalRead(button1) == LOW ? "off" : "on",
+                 digitalRead(button2) == LOW ? "off" : "on");
         sendLogMessage(relayStatus);
 
         // Установить начальные углы сервоприводов
@@ -337,8 +344,8 @@ void onMessageCallback(WebsocketsMessage message)
     {
         char relayStatus[64];
         snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                 digitalRead(button1) == LOW ? "on" : "off",
-                 digitalRead(button2) == LOW ? "on" : "off");
+                 digitalRead(button1) == LOW ? "off" : "on",
+                 digitalRead(button2) == LOW ? "off" : "on");
         sendLogMessage(relayStatus);
         return;
     }
@@ -381,7 +388,7 @@ void onMessageCallback(WebsocketsMessage message)
         //sendLogMessage("Heartbeat - OK");
         //return;
     }
-    if (strcmp(co, "RLY") == 0)
+    else if (strcmp(co, "RLY") == 0)
     {
         const char *pin = doc["pa"]["pin"];
         const char *state = doc["pa"]["state"];
@@ -393,13 +400,14 @@ void onMessageCallback(WebsocketsMessage message)
 
         if (strcmp(pin, "3") == 0)
         {
-            digitalWrite(button1, strcmp(state, "on") == 0 ? LOW : HIGH);
+            digitalWrite(button1, strcmp(state, "on") == 0 ? HIGH : LOW);
             Serial.println("Relay 1 (3) set to: " + String(digitalRead(button1)));
 
         }
         else if (strcmp(pin, "D0") == 0)
         {
-            digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
+            stopMotors();
+            digitalWrite(button2, strcmp(state, "on") == 0 ? HIGH : LOW);
             Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
             Serial.println("Relay 2 (D0) set to: " + String(state));
         }
@@ -412,6 +420,33 @@ void onMessageCallback(WebsocketsMessage message)
         JsonObject pa = ackDoc.createNestedObject("pa");
         pa["pin"] = pin;
         pa["state"] = state; // Используем запрошенное состояние вместо digitalRead
+        String output;
+        serializeJson(ackDoc, output);
+        Serial.println("Отправка подтверждения на сервер: " + output);
+        if (!client.send(output)) {
+            Serial.println("Ошибка отправки подтверждения на сервер!");
+        } else {
+            Serial.println("Подтверждение успешно отправлено: " + output);
+        }
+    }
+
+    else if (strcmp(co, "ALARM") == 0)
+    {
+        const char *state = doc["pa"]["state"];
+
+        if (!state) {
+            Serial.println("Ошибка: pin или state отсутствуют в JSON!");
+            return;
+        }
+
+        alarm = state;
+        // Формирование ответа
+        StaticJsonDocument<256> ackDoc;
+        ackDoc["ty"] = "ack";
+        ackDoc["co"] = "ALARM";
+        ackDoc["de"] = de;
+        JsonObject pa = ackDoc.createNestedObject("pa");
+        pa["state"] = alarm;
         String output;
         serializeJson(ackDoc, output);
         Serial.println("Отправка подтверждения на сервер: " + output);
@@ -490,8 +525,12 @@ void setup()
     pinMode(in4, OUTPUT);
     pinMode(button1, OUTPUT);
     pinMode(button2, OUTPUT);
-    digitalWrite(button1, LOW);
-    digitalWrite(button2, LOW);
+    digitalWrite(button1, HIGH);
+    digitalWrite(button2, HIGH);
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    digitalWrite(in3, HIGH);
+    digitalWrite(in4, LOW);
     stopMotors();
     Serial.println("Motors and relays initialized");
 }
@@ -519,19 +558,46 @@ void loop() {
         client.poll();
 
         if (isIdentified) {
+            if (millis() - lastAnalogReadTime > 100) {
 
-            if(digitalRead(button2) == HIGH) {
-                if (millis() - lastAnalogReadTime > 300) {
+                // if(alarm == "on" && digitalRead(button3Rob) == LOW){
+                //     digitalWrite(button2, LOW);
+                // }
+
+                // if (digitalRead(button3Rob) == LOW) {
+                //     digitalWrite(button2, LOW);
+                // } else {
+                //     digitalWrite(button2, HIGH);
+                // }
+
+                if(digitalRead(button2) == LOW) {
+
                     lastAnalogReadTime = millis();
-                    if(analogRead(analogPin) < 50  && millis() - lastMillisAlarm > 5000){
-                        lastMillisAlarm = millis();
-                        // Serial.println("ALARM TRUE 11111111111111111111111111111");
-                        // Serial.print(analogRead(analogPin));
-                        // Serial.print(" ");
-                        // Serial.println(analogRead(button1));
-                        sendLogMessage("ALARM TRUE");
+                    digitalRead(button3Rob);
+                    int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
+                    int pwmValue = map(potValue, 0, 1023, 0, 255);
+                    if(pwmValue > 1){
+                        lastHeartbeat2Time = millis();
                     }
+
+                    // digitalWrite(in3, HIGH);
+                    // digitalWrite(in4, LOW);
+                    analogWrite(enB, pwmValue); // Устанавливаем скорость для мотора B
+                    Serial.println(potValue);
+                    //digitalRead(button3Rob) == LOW  && digitalRead(button1) && analogRead(analogPin) < 50 Для кнопки оповещения
+
                 }
+            }
+
+            if(millis() - lastMillisAlarm > 5000 && digitalRead(button3Rob) == LOW && alarm == "on" ){
+                lastMillisAlarm = millis();
+                alarmMotion = true;
+                // Serial.println("ALARM TRUE 11111111111111111111111111111");
+                // Serial.print(analogRead(analogPin));
+                // Serial.print(" ");
+                // Serial.println(analogRead(button1));
+                stopMotors();
+                sendLogMessage("ALARM TRUE");
             }
 
             if (millis() - lastHeartbeatTime > 5000) {
@@ -539,8 +605,8 @@ void loop() {
                 sendLogMessage("HBT");
                 char relayStatus[64];
                 snprintf(relayStatus, sizeof(relayStatus), "Relay states: D0=%s, 3=%s",
-                         digitalRead(button1) == LOW ? "on" : "off",
-                         digitalRead(button2) == LOW ? "on" : "off");
+                         digitalRead(button1) == LOW ? "off" : "on",
+                         digitalRead(button2) == LOW ? "off" : "on");
                 //sendLogMessage(relayStatus);
             }
 
