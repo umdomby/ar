@@ -5,113 +5,57 @@
 const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
 
-// Публичный IP твоего сервера (VPS или домашний с пробросом порта)
 const char* serverIP = "213.184.249.66";
-//const char* serverIP = "192.168.1.121";
 const int serverPort = 5000;
 
-// Статический IP для ESP32 в локальной сети
-IPAddress local_IP(192, 168, 1, 171);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress primaryDNS(8, 8, 8, 8);
-IPAddress secondaryDNS(8, 8, 4, 4);
+// Уникальное имя для каждой ESP32
+const char* deviceName = "ESP32-LivingRoom";  // ← поменяй на каждой плате!
 
 WiFiUDP udp;
+unsigned int localUdpPort = 12345;  // фиксированный порт для P2P
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-
-  // Настраиваем статический IP ДО подключения к WiFi
-  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-    Serial.println("Ошибка: не удалось настроить статический IP!");
-  }
-
-  Serial.print("Подключение к WiFi: ");
-  Serial.println(ssid);
+  pinMode(LED_BUILTIN, OUTPUT);  // встроенный светодиод (или подключи RGB)
 
   WiFi.begin(ssid, password);
-
-  // Таймаут подключения 20 сек
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    attempts++;
   }
+  Serial.println("\nWiFi connected");
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("\nНе удалось подключиться к WiFi!");
-    return;
-  }
-
-  Serial.println("\nWiFi подключён!");
-  Serial.print("Локальный IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("MAC-адрес: ");
-  Serial.println(WiFi.macAddress());
-
-  // Запускаем UDP (локальный порт не важен, можно 0)
-  udp.begin(0);
+  udp.begin(localUdpPort);
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi потерян. Переподключение...");
-    WiFi.reconnect();
-    delay(5000);
-    return;
-  }
-
-  // Формируем сообщение
-  String localIP = WiFi.localIP().toString();
-  String message = "REGISTER:" + localIP;
-
-  // Отправляем UDP-пакет
+  // Регистрация каждые 10 сек
+  String msg = String("REGISTER:") + deviceName + ":" + WiFi.localIP().toString();
   udp.beginPacket(serverIP, serverPort);
-  udp.print(message);
+  udp.write((const uint8_t*)msg.c_str(), msg.length());
   udp.endPacket();
 
-  Serial.print("Отправлено UDP на ");
-  Serial.print(serverIP);
-  Serial.print(": ");
-  Serial.println(message);
+  // Получаем команды от Windows
+  int packetSize = udp.parsePacket();
+  if (packetSize) {
+    char incoming[32];
+    int len = udp.read(incoming, sizeof(incoming));
+    incoming[len] = 0;
+    String cmd = String(incoming);
 
-  // Ждём ответ максимум 3 секунды
-  unsigned long startTime = millis();
-  bool received = false;
+    if (cmd.startsWith("COLOR:")) {
+      // Формат: COLOR:#FF00AA
+      String hex = cmd.substring(6);
+      long color = strtol(hex.c_str(), NULL, 16);
+      int r = (color >> 16) & 0xFF;
+      int g = (color >> 8) & 0xFF;
+      int b = color & 0xFF;
 
-  while (millis() - startTime < 3000) {
-    int packetSize = udp.parsePacket();
-    if (packetSize > 0) {
-      char incomingPacket[64];
-      int len = udp.read(incomingPacket, sizeof(incomingPacket) - 1);
-      if (len > 0) {
-        incomingPacket[len] = '\0';  // Завершаем строку
-      }
-
-      String response = String(incomingPacket);
-      Serial.print("Получен ответ: ");
-      Serial.println(response);
-
-      if (response == "OK" || response.startsWith("OK")) {
-        Serial.println("Подтверждение получено! Регистрация завершена.");
-        // Можно мигнуть светодиодом или вывести сообщение
-        while (true) {
-          delay(10000);  // Бесконечный цикл — больше не шлём
-        }
-      }
-
-      received = true;
-      break;
+      // Для встроенного LED просто включаем/выключаем
+      digitalWrite(LED_BUILTIN, HIGH);  // или используй analogWrite для RGB
+      Serial.printf("Set color: #%s -> R%d G%d B%d\n", hex.c_str(), r, g, b);
     }
-    delay(100);  // Не грузим процессор
   }
 
-  if (!received) {
-    Serial.println("Ответ не получен (таймаут). Повтор через 5 сек...");
-  }
-
-  delay(5000);  // Ждём 5 секунд перед следующей попыткой
+  delay(10000);  // регистрация каждые 10 сек
 }
