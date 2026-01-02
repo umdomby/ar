@@ -2,15 +2,16 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-const char* ssid = "Robolab134";
+const char* ssid = "Robolab124";
 const char* password = "wifi123123123";
 
 // Публичный IP твоего сервера (VPS или домашний с пробросом порта)
 const char* serverIP = "213.184.249.66";
-const int serverPort = 8080;
+//const char* serverIP = "192.168.1.121";
+const int serverPort = 5000;
 
 // Статический IP для ESP32 в локальной сети
-IPAddress local_IP(192, 168, 1, 150);
+IPAddress local_IP(192, 168, 1, 171);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress primaryDNS(8, 8, 8, 8);
