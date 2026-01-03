@@ -1,117 +1,157 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiUdp.h>
+#include <WebSocketsClient.h>
+#include <ArduinoJson.h>
+#include <FastLED.h>
 
-const char* ssid = "Robolab124";
+// ================ НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ ================
+const char* ssid = "Robolab124";                    // Ваш WiFi
 const char* password = "wifi123123123";
+const char* websocket_server = "wss://ardu.live/wsard";
 
-// Публичный IP твоего сервера (VPS или домашний с пробросом порта)
-const char* serverIP = "213.184.249.66";
-//const char* serverIP = "192.168.1.121";
-const int serverPort = 5000;
+// УНИКАЛЬНЫЙ 16-ЗНАЧНЫЙ КОД УСТРОЙСТВА (A-Z, a-z, 0-9)
+const char* DEVICE_ID = "ABCD1234EFGH5678";   // ←←←← ИЗМЕНИТЕ НА СВОЙ КОД
 
-// Статический IP для ESP32 в локальной сети
-IPAddress local_IP(192, 168, 1, 171);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress primaryDNS(8, 8, 8, 8);
-IPAddress secondaryDNS(8, 8, 4, 4);
+// ================ RGB LED НАСТРОЙКИ ================
+#define LED_PIN     48          // Пин для WS2812 / NeoPixel на ESP32-S3
+#define NUM_LEDS    1           // Количество светодиодов (обычно 1 встроенный)
+#define BRIGHTNESS  255
+CRGB leds[NUM_LEDS];
 
-WiFiUDP udp;
+WebSocketsClient webSocket;
+
+bool isIdentified = false;
+unsigned long lastHeartbeat = 0;
+
+void setColor(uint8_t r, uint8_t g, uint8_t b, bool on) {
+  if (on) {
+    leds[0] = CRGB(r, g, b);
+  } else {
+    leds[0] = CRGB::Black;
+  }
+  FastLED.show();
+}
+
+void sendLog(const char* message) {
+  if (!webSocket.isConnected()) return;
+  
+  DynamicJsonDocument doc(256);
+  doc["ty"] = "log";
+  doc["me"] = message;
+  doc["de"] = DEVICE_ID;
+  doc["on"] = (leds[0] != CRGB::Black);
+  doc["r"] = leds[0].r;
+  doc["g"] = leds[0].g;
+  doc["b"] = leds[0].b;
+  
+  String output;
+  serializeJson(doc, output);
+  webSocket.sendTXT(output);
+}
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.println("[WS] Disconnected");
+      isIdentified = false;
+      break;
+      
+    case WStype_CONNECTED: {
+      Serial.printf("[WS] Connected to: %s\n", payload);
+      
+      // Сначала отправляем тип клиента
+      webSocket.sendTXT("{\"ty\":\"clt\",\"ct\":\"esp\"}");
+      
+      // Затем идентификация — переменная внутри блока {}
+      String idMsg = "{\"ty\":\"idn\",\"de\":\"" + String(DEVICE_ID) + "\"}";
+      webSocket.sendTXT(idMsg);
+      break;
+    }
+      
+    case WStype_TEXT: {
+      String text = (char*)payload;
+      Serial.printf("[WS] Received: %s\n", text.c_str());
+      
+      DynamicJsonDocument doc(512);
+      DeserializationError error = deserializeJson(doc, text);
+      if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+      }
+      
+      const char* ty = doc["ty"];
+      if (!ty) return;
+      
+      if (strcmp(ty, "sys") == 0 && doc.containsKey("st") && strcmp(doc["st"], "con") == 0) {
+        isIdentified = true;
+        Serial.println("Успешно идентифицирован!");
+        sendLog("ESP32 RGB подключён");
+        return;
+      }
+      
+      const char* co = doc["co"];
+      if (!co) return;
+      
+      if (strcmp(co, "RGB") == 0) {
+        bool on = doc["pa"]["on"];
+        uint8_t r = doc["pa"]["r"] | 0;
+        uint8_t g = doc["pa"]["g"] | 0;
+        uint8_t b = doc["pa"]["b"] | 0;
+        
+        setColor(r, g, b, on);
+        sendLog(on ? "Цвет установлен" : "Свет выключен");
+        
+        // Подтверждение
+        DynamicJsonDocument ack(256);
+        ack["ty"] = "ack";
+        ack["co"] = "RGB";
+        ack["de"] = DEVICE_ID;
+        JsonObject pa = ack.createNestedObject("pa");
+        pa["on"] = on;
+        pa["r"] = r;
+        pa["g"] = g;
+        pa["b"] = b;
+        String out;
+        serializeJson(ack, out);
+        webSocket.sendTXT(out);
+      }
+      break;
+    }
+      
+    default:
+      break;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  Serial.println("ESP32 RGB Controller Starting...");
 
-  // Настраиваем статический IP ДО подключения к WiFi
-  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-    Serial.println("Ошибка: не удалось настроить статический IP!");
-  }
-
-  Serial.print("Подключение к WiFi: ");
-  Serial.println(ssid);
+  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_LEDS);
+  FastLED.setBrightness(BRIGHTNESS);
+  setColor(0, 0, 0, false);
 
   WiFi.begin(ssid, password);
-
-  // Таймаут подключения 20 сек
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    attempts++;
   }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("\nНе удалось подключиться к WiFi!");
-    return;
-  }
-
-  Serial.println("\nWiFi подключён!");
-  Serial.print("Локальный IP: ");
+  Serial.println("\nWiFi connected");
+  Serial.print("IP: ");
   Serial.println(WiFi.localIP());
-  Serial.print("MAC-адрес: ");
-  Serial.println(WiFi.macAddress());
 
-  // Запускаем UDP (локальный порт не важен, можно 0)
-  udp.begin(0);
+  webSocket.beginSSL("ardu.live", 444, "/wsard");
+  webSocket.onEvent(webSocketEvent);
+  webSocket.setReconnectInterval(5000);
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi потерян. Переподключение...");
-    WiFi.reconnect();
-    delay(5000);
-    return;
+  webSocket.loop();
+  
+  if (isIdentified && millis() - lastHeartbeat > 10000) {
+    lastHeartbeat = millis();
+    sendLog("heartbeat");
   }
-
-  // Формируем сообщение
-  String localIP = WiFi.localIP().toString();
-  String message = "REGISTER:" + localIP;
-
-  // Отправляем UDP-пакет
-  udp.beginPacket(serverIP, serverPort);
-  udp.print(message);
-  udp.endPacket();
-
-  Serial.print("Отправлено UDP на ");
-  Serial.print(serverIP);
-  Serial.print(": ");
-  Serial.println(message);
-
-  // Ждём ответ максимум 3 секунды
-  unsigned long startTime = millis();
-  bool received = false;
-
-  while (millis() - startTime < 3000) {
-    int packetSize = udp.parsePacket();
-    if (packetSize > 0) {
-      char incomingPacket[64];
-      int len = udp.read(incomingPacket, sizeof(incomingPacket) - 1);
-      if (len > 0) {
-        incomingPacket[len] = '\0';  // Завершаем строку
-      }
-
-      String response = String(incomingPacket);
-      Serial.print("Получен ответ: ");
-      Serial.println(response);
-
-      if (response == "OK" || response.startsWith("OK")) {
-        Serial.println("Подтверждение получено! Регистрация завершена.");
-        // Можно мигнуть светодиодом или вывести сообщение
-        while (true) {
-          delay(10000);  // Бесконечный цикл — больше не шлём
-        }
-      }
-
-      received = true;
-      break;
-    }
-    delay(100);  // Не грузим процессор
-  }
-
-  if (!received) {
-    Serial.println("Ответ не получен (таймаут). Повтор через 5 сек...");
-  }
-
-  delay(5000);  // Ждём 5 секунд перед следующей попыткой
 }
