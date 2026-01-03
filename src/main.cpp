@@ -6,7 +6,7 @@
 
 unsigned long lastWiFiCheck = 0;
 unsigned long disconnectStartTime = 0;
-const unsigned long MAX_DISCONNECT_TIME = 1UL * 60UL * 60UL * 1000UL; // 10 часов в миллисекундах
+const unsigned long MAX_DISCONNECT_TIME = 1UL * 60UL * 60UL * 1000UL; // 1 час в миллисекундах
 
 const int analogPin = A0;
 
