@@ -6,7 +6,7 @@
 
 unsigned long lastWiFiCheck = 0;
 unsigned long disconnectStartTime = 0;
-const unsigned long MAX_DISCONNECT_TIME = 20UL * 60UL * 60UL * 1000UL; // 10 часов в миллисекундах
+const unsigned long MAX_DISCONNECT_TIME = 1UL * 60UL * 60UL * 1000UL; // 10 часов в миллисекундах
 
 const int analogPin = A0;
 
@@ -537,9 +537,9 @@ void loop() {
             connectToServer();
         }
 
-        // Проверка длительного отключения (20 часов)
+        // Проверка длительного отключения (1 час)
         if (disconnectStartTime > 0 && (millis() - disconnectStartTime > MAX_DISCONNECT_TIME)) {
-            Serial.println("No connection for 20 hours, restarting...");
+            Serial.println("No connection for 1 hour, restarting...");
             ESP.restart(); // Программный перезапуск
         }
     } else {
