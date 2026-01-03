@@ -6,7 +6,7 @@
 
 unsigned long lastWiFiCheck = 0;
 unsigned long disconnectStartTime = 0;
-const unsigned long MAX_DISCONNECT_TIME = 1UL * 60UL * 60UL * 1000UL; // 10 часов в миллисекундах
+const unsigned long MAX_DISCONNECT_TIME = 1UL * 60UL * 60UL * 1000UL; // 1 час в миллисекундах
 
 const int analogPin = A0;
 
@@ -394,9 +394,8 @@ void onMessageCallback(WebsocketsMessage message)
         }
         else if (strcmp(pin, "D0") == 0)
         {
-            stopMotors();
-            digitalWrite(button2, strcmp(state, "on") == 0 ? HIGH : LOW);
-            Serial.println("Relay 2 (D0) set to: " + String(digitalRead(button2)));
+            stopMotors();  // Всегда останавливаем моторы при переключении реле
+            digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
             Serial.println("Relay 2 (D0) set to: " + String(state));
         }
 
@@ -558,23 +557,17 @@ void loop() {
                 //     digitalWrite(button2, HIGH);
                 // }
 
-                if(digitalRead(button2) == LOW) {
-                
-                    lastAnalogReadTime = millis();
-                    digitalRead(button3Rob);
-                    int potValue = analogRead(analogPin); // Чтение с A0 (0-1023)
-                    int pwmValue = map(potValue, 0, 1023, 0, 255);
-                    if(pwmValue > 1){
-                        lastHeartbeat2Time = millis();
-                    }
-
-                    // digitalWrite(in3, HIGH);
-                    // digitalWrite(in4, LOW);
-                    analogWrite(enB, pwmValue); // Устанавливаем скорость для мотора B
-                    Serial.println(potValue);
-                    //digitalRead(button3Rob) == LOW  && digitalRead(button1) && analogRead(analogPin) < 50 Для кнопки оповещения
-
-                }
+                // if(digitalRead(button2) == LOW) {
+                //     lastAnalogReadTime = millis();
+                //     digitalRead(button3Rob);
+                //     int potValue = analogRead(analogPin);
+                //     int pwmValue = map(potValue, 0, 1023, 0, 255);
+                //     if(pwmValue > 1){
+                //         lastHeartbeat2Time = millis();
+                //     }
+                //     analogWrite(enB, pwmValue);
+                //     Serial.println(potValue);
+                // }
             }
 
             if(millis() - lastMillisAlarm > 5000 && digitalRead(button3Rob) == LOW && alarm == "on" ){
