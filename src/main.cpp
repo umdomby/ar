@@ -32,7 +32,7 @@ using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://ardua.site:444/wsar";
+const char *websocket_server = "wss://a.ardu.live:444/wsard";
 
 String alarm = "off";
 boolean alarmMotion = false;
