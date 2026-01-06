@@ -469,7 +469,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
     Serial.println("Starting ESP8266...");
-    Serial.end();
+    // Serial.end();
     // Инициализация первого сервопривода
     if (Servo1.attach(SERVO1_PIN, 90) == INVALID_SERVO)
     {
@@ -592,6 +592,7 @@ void loop() {
             }
 
             if (millis() - lastHeartbeat2Time > 700) {
+                Serial.print("HBT");
                 stopMotors();
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
