@@ -29,6 +29,8 @@ const int analogPin = A0;
 ServoEasing Servo1;
 ServoEasing Servo2;
 
+bool enableHeartbeatMotorProtection = true;
+
 using namespace websockets;
 
 const char *ssid = "Robolab124";
@@ -109,6 +111,7 @@ void stopMotors()
 {
     analogWrite(enA, 0);
     analogWrite(enB, 0);
+    enableHeartbeatMotorProtection = false;
     // digitalWrite(in1, LOW);
     // digitalWrite(in2, LOW);
     // digitalWrite(in3, LOW);
@@ -373,6 +376,7 @@ void onMessageCallback(WebsocketsMessage message)
     else if (strcmp(co, "HBT") == 0)
     {
         lastHeartbeat2Time = millis();
+        enableHeartbeatMotorProtection = true;
         //sendLogMessage("Heartbeat - OK");
         //return;
     }
@@ -394,7 +398,7 @@ void onMessageCallback(WebsocketsMessage message)
         }
         else if (strcmp(pin, "D0") == 0)
         {
-            stopMotors();  // Всегда останавливаем моторы при переключении реле
+            //stopMotors();  // Всегда останавливаем моторы при переключении реле
             digitalWrite(button2, strcmp(state, "on") == 0 ? LOW : HIGH);
             Serial.println("Relay 2 (D0) set to: " + String(state));
         }
@@ -592,8 +596,10 @@ void loop() {
             }
 
             if (millis() - lastHeartbeat2Time > 700) {
-                Serial.print("HBT");
-                stopMotors();
+                if (enableHeartbeatMotorProtection) {
+                    stopMotors();
+                    Serial.print("HBT stopMotors()");
+                }
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
             lastReconnectAttempt = millis();
