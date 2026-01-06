@@ -28,11 +28,13 @@ const int analogPin = A0;
 ServoEasing Servo1;
 ServoEasing Servo2;
 
+bool enableHeartbeatMotorProtection = true;
+
 using namespace websockets;
 
 const char *ssid = "Robolab124";
 const char *password = "wifi123123123";
-const char *websocket_server = "wss://a.ardu.live:444/wsard";
+const char *websocket_server = "wss://a.ardu.live:444/wsar";
 
 String alarm = "off";
 boolean alarmMotion = false;
@@ -107,6 +109,7 @@ void stopMotors()
 {
     analogWrite(enA, 0);
     analogWrite(enB, 0);
+    enableHeartbeatMotorProtection = false;
 }
 
 void identifyDevice()
@@ -292,6 +295,7 @@ void onMessageCallback(WebsocketsMessage message)
     else if (strcmp(co, "HBT") == 0)
     {
         lastHeartbeat2Time = millis();
+        enableHeartbeatMotorProtection = true;
     }
     else if (strcmp(co, "RLY") == 0)
     {
@@ -437,7 +441,10 @@ void loop() {
             }
 
             if (millis() - lastHeartbeat2Time > 700) {
-                stopMotors();
+                if (enableHeartbeatMotorProtection) {
+                    stopMotors();
+                    Serial.print("HBT stopMotors()");
+                }
             }
         } else if (millis() - lastReconnectAttempt > 3000) {
             lastReconnectAttempt = millis();
