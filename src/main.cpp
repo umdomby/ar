@@ -108,12 +108,12 @@ void onMessageCallback(WebsocketsMessage message) {
       break;
 
     case CMD_HBT_MOTOR:
-      Serial.print("HBT_MOTOR ");  // В линию без новой строки
+      Serial.print("HBT_MOTOR ");
       lastClientHbTime = millis();
       enableMotorProtection = true;
       break;
 
-case CMD_MOTOR:
+    case CMD_MOTOR:
       if (len < 5) {
         Serial.println("→ CMD_MOTOR: слишком короткое");
         return;
@@ -129,26 +129,23 @@ case CMD_MOTOR:
         uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
         uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
 
-        // Устанавливаем скорость
         analogWrite(pwmPin, speed);
 
-        // Управление направлением
-        if (dir == 1) {         // forward
+        if (dir == 1) {
           digitalWrite(inPin1, HIGH);
           digitalWrite(inPin2, LOW);
-        } else if (dir == 2) {  // backward
+        } else if (dir == 2) {
           digitalWrite(inPin1, LOW);
           digitalWrite(inPin2, HIGH);
-        } else {                // dir == 0 → стоп (но PWM уже 0, просто сбрасываем направление)
+        } else {
           digitalWrite(inPin1, LOW);
           digitalWrite(inPin2, LOW);
         }
 
-        // Включаем защиту по HBT_MOTOR — если пришла любая команда мотора
         lastClientHbTime = millis();
         enableMotorProtection = true;
 
-        sendAck(CMD_MOTOR, speed);
+        // УДАЛЕНО: sendAck(CMD_MOTOR, speed);
       }
       break;
 
@@ -165,7 +162,7 @@ case CMD_MOTOR:
         if (num == 1) Servo1.write(angle);
         else if (num == 2) Servo2.write(angle);
 
-        sendAck(CMD_SERVO_ABS, angle);
+        // УДАЛЕНО: sendAck(CMD_SERVO_ABS, angle);
       }
       break;
 
@@ -178,7 +175,8 @@ case CMD_MOTOR:
         uint8_t state = data[1];
         Serial.printf("→ RELAY state=%d\n", state);
         digitalWrite(PIN_RELAY, state ? LOW : HIGH);
-        sendAck(CMD_RELAY, state);
+
+        // УДАЛЕНО: sendAck(CMD_RELAY, state);
       }
       break;
 
@@ -188,7 +186,8 @@ case CMD_MOTOR:
         return;
       }
       Serial.printf("→ ALARM state=%d\n", data[1]);
-      sendAck(CMD_ALARM, data[1]);
+
+      // УДАЛЕНО: sendAck(CMD_ALARM, data[1]);
       break;
 
     default:
@@ -287,14 +286,14 @@ void loop() {
 
   unsigned long now = millis();
 
-  // Heartbeat от ESP к серверу каждые ~2.5 сек
-  if (now - lastHbTx >= 2500) {
-    lastHbTx = now;
-    sendHeartbeat();
-  }
+// Heartbeat от ESP к серверу каждые 30000 мс
+//   if (now - lastHbTx >= 30000) {
+//     lastHbTx = now;
+//     sendHeartbeat();
+//   }
 
-  // Статус каждые ~800 мс
-  if (identified && now - lastStatusTx >= 800) {
+  // Статус каждые ~30000 мс
+  if (identified && now - lastStatusTx >= 30000) {
     lastStatusTx = now;
     sendFullStatus();
   }
