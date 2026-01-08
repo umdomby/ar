@@ -1,9 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <ArduinoWebsockets.h>
+#include <WebSocketsClient.h>  // Links2004
 #include <ServoEasing.hpp>
-
-using namespace websockets;
 
 // Пины для ESP32-S3
 #define PIN_ENA     18
@@ -20,11 +18,13 @@ using namespace websockets;
 // Настройки
 const char* ssid       = "Robolab124";
 const char* password   = "wifi123123123";
-const char* ws_url     = "wss://a.ardu.live:444/wsar";
+const char* ws_host    = "a.ardu.live";
+const uint16_t ws_port = 444;
+const char* ws_path    = "/wsar";
 const char* DEVICE_ID  = "9999999999999999";  // 16 символов
 
 ServoEasing Servo1, Servo2;
-WebsocketsClient client;
+WebSocketsClient client;
 
 bool identified = false;
 unsigned long lastStatusTx = 0;
@@ -46,8 +46,8 @@ bool enableMotorProtection = false;
 
 // ────────────────────────────────────────────────────────────────
 void sendBinary(const uint8_t* data, size_t len) {
-  if (client.available()) {
-    client.sendBinary((const char*)data, len);
+  if (client.isConnected()) {  // ← ИСПРАВЛЕНО: isConnected() вместо connected()
+    client.sendBIN(data, len);
   }
 }
 
@@ -75,119 +75,112 @@ void stopMotors() {
 }
 
 // ────────────────────────────────────────────────────────────────
-void onMessageCallback(WebsocketsMessage message) {
-  if (!message.isBinary()) {
-    Serial.println("Получено НЕ бинарное сообщение — игнорируем");
-    return;
-  }
-
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(message.c_str());
-  size_t len = message.length();
-
-  if (len == 0) return;
-
-  uint8_t cmd = data[0];
-  Serial.printf("Получено бинарное: cmd=0x%02X, len=%d  ", cmd, len);
-
-  switch (cmd) {
-    case CMD_HEARTBEAT:
-      Serial.println("→ HEARTBEAT");
-      break;
-
-    case CMD_HBT_MOTOR:
-      Serial.print("HBT_MOTOR ");
-      lastClientHbTime = millis();
-      enableMotorProtection = true;
-      break;
-
-    case CMD_MOTOR:
-      if (len < 5) { Serial.println("→ CMD_MOTOR: слишком короткое"); break; }
-      {
-        char motor = data[1];
-        uint8_t speed = data[2];
-        uint8_t dir = data[3];
-
-        Serial.printf("→ MOTOR %c: speed=%d, dir=%d\n", motor, speed, dir);
-
-        uint8_t pwmPin = (motor == 'A') ? PIN_ENA : PIN_ENB;
-        uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
-        uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
-
-        analogWrite(pwmPin, speed);
-
-        if (dir == 1) {
-          digitalWrite(inPin1, HIGH);
-          digitalWrite(inPin2, LOW);
-        } else if (dir == 2) {
-          digitalWrite(inPin1, LOW);
-          digitalWrite(inPin2, HIGH);
-        } else {
-          digitalWrite(inPin1, LOW);
-          digitalWrite(inPin2, LOW);
-        }
-
-        lastClientHbTime = millis();
-        enableMotorProtection = true;
-      }
-      break;
-
-    case CMD_SERVO_ABS:
-      if (len < 4) { Serial.println("→ CMD_SERVO_ABS: слишком короткое"); break; }
-      {
-        uint8_t num = data[1];
-        uint8_t angle = constrain(data[2], 0, 180);
-        Serial.printf("→ SERVO %d → angle=%d\n", num, angle);
-
-        if (num == 1) Servo1.write(angle);
-        else if (num == 2) Servo2.write(angle);
-      }
-      break;
-
-    case CMD_RELAY:
-      if (len < 3) { Serial.println("→ CMD_RELAY: слишком короткое"); break; }
-      {
-        uint8_t state = data[1];
-        Serial.printf("→ RELAY state=%d\n", state);
-        digitalWrite(PIN_RELAY, state ? LOW : HIGH);
-      }
-      break;
-
-    case CMD_ALARM:
-      if (len < 2) { Serial.println("→ CMD_ALARM: слишком короткое"); break; }
-      Serial.printf("→ ALARM state=%d\n", data[1]);
-      break;
-
-    default:
-      Serial.printf("→ НЕИЗВЕСТНАЯ КОМАНДА 0x%02X\n", cmd);
-  }
-}
-
-void onEventsCallback(WebsocketsEvent event, String data) {
-  switch (event) {
-    case WebsocketsEvent::ConnectionOpened:
-      Serial.println("[WS] Connected");
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.println("[WS] Disconnected");
       identified = false;
+      stopMotors();
+      enableMotorProtection = false;
+      break;
 
+    case WStype_CONNECTED:
+      Serial.printf("[WS] Connected to url: %s\n", payload);
+
+      // Тип клиента
       {
-        uint8_t buf_type[2] = {CMD_CLIENT_TYPE, 2};
-        sendBinary(buf_type, 2);
+        uint8_t buf[2] = {CMD_CLIENT_TYPE, 2};
+        sendBinary(buf, 2);
       }
 
+      // Идентификация
       {
-        uint8_t buf_id[17];
-        buf_id[0] = CMD_IDENTIFY;
-        memcpy(buf_id + 1, DEVICE_ID, 16);
-        sendBinary(buf_id, 17);
+        uint8_t buf[17];
+        buf[0] = CMD_IDENTIFY;
+        memcpy(buf + 1, DEVICE_ID, 16);
+        sendBinary(buf, 17);
       }
 
       identified = true;
       break;
 
-    case WebsocketsEvent::ConnectionClosed:
-      Serial.println("[WS] Disconnected");
-      identified = false;
-      stopMotors();
-      enableMotorProtection = false;
+    case WStype_BIN:
+      if (length == 0) return;
+
+      uint8_t cmd = payload[0];
+      Serial.printf("Получено бинарное: cmd=0x%02X, len=%d  ", cmd, length);
+
+      switch (cmd) {
+        case CMD_HEARTBEAT:
+          Serial.println("→ HEARTBEAT");
+          break;
+
+        case CMD_HBT_MOTOR:
+          Serial.print("HBT_MOTOR ");
+          lastClientHbTime = millis();
+          enableMotorProtection = true;
+          break;
+
+        case CMD_MOTOR:
+          if (length < 5) { Serial.println("→ CMD_MOTOR: слишком короткое"); break; }
+          {
+            char motor = payload[1];
+            uint8_t speed = payload[2];
+            uint8_t dir = payload[3];
+
+            Serial.printf("→ MOTOR %c: speed=%d, dir=%d\n", motor, speed, dir);
+
+            uint8_t pwmPin = (motor == 'A') ? PIN_ENA : PIN_ENB;
+            uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
+            uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
+
+            analogWrite(pwmPin, speed);
+
+            if (dir == 1) {
+              digitalWrite(inPin1, HIGH);
+              digitalWrite(inPin2, LOW);
+            } else if (dir == 2) {
+              digitalWrite(inPin1, LOW);
+              digitalWrite(inPin2, HIGH);
+            } else {
+              digitalWrite(inPin1, LOW);
+              digitalWrite(inPin2, LOW);
+            }
+
+            lastClientHbTime = millis();
+            enableMotorProtection = true;
+          }
+          break;
+
+        case CMD_SERVO_ABS:
+          if (length < 4) { Serial.println("→ CMD_SERVO_ABS: слишком короткое"); break; }
+          {
+            uint8_t num = payload[1];
+            uint8_t angle = constrain(payload[2], 0, 180);
+            Serial.printf("→ SERVO %d → angle=%d\n", num, angle);
+
+            if (num == 1) Servo1.write(angle);
+            else if (num == 2) Servo2.write(angle);
+          }
+          break;
+
+        case CMD_RELAY:
+          if (length < 3) { Serial.println("→ CMD_RELAY: слишком короткое"); break; }
+          {
+            uint8_t state = payload[1];
+            Serial.printf("→ RELAY state=%d\n", state);
+            digitalWrite(PIN_RELAY, state ? LOW : HIGH);
+          }
+          break;
+
+        case CMD_ALARM:
+          if (length < 2) { Serial.println("→ CMD_ALARM: слишком короткое"); break; }
+          Serial.printf("→ ALARM state=%d\n", payload[1]);
+          break;
+
+        default:
+          Serial.printf("→ НЕИЗВЕСТНАЯ КОМАНДА 0x%02X\n", cmd);
+      }
       break;
   }
 }
@@ -224,37 +217,20 @@ void setup() {
   }
   Serial.printf("\nIP: %s\n", WiFi.localIP().toString().c_str());
 
-  client.onMessage(onMessageCallback);
-  client.onEvent(onEventsCallback);
-
-  // Для ESP32 в библиотеке gilmaimon/ArduinoWebsockets WSS работает БЕЗ setInsecure() и БЕЗ fingerprint
-  // Просто подключаемся к wss://...
-  // Если сервер использует валидный сертификат (Let's Encrypt или подобный), цепочка проверяется автоматически.
-  // На ESP8266 работало с игнором, на ESP32 — строже, но для вашего сервера должно пройти.
-
-  client.connect(ws_url);
+  client.beginSSL(ws_host, ws_port, ws_path);  // WSS подключение
+  client.onEvent(webSocketEvent);
+  client.setReconnectInterval(3000);  // Автоматический реконнект
 }
 
 void loop() {
+  client.loop();  // Делает всё: poll, reconnect, обработку событий
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi lost → reconnect");
     WiFi.reconnect();
     delay(2000);
     return;
   }
-
-  if (!client.available()) {
-    Serial.print("WS reconnect... ");
-    if (client.connect(ws_url)) {
-      Serial.println("OK");
-    } else {
-      Serial.println("fail");
-    }
-    delay(3000);
-    return;
-  }
-
-  client.poll();
 
   unsigned long now = millis();
 
