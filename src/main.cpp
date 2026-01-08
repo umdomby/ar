@@ -134,8 +134,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
             uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
 
-            analogWrite(pwmPin, speed);
-
             if (dir == 1) {
               digitalWrite(inPin1, HIGH);
               digitalWrite(inPin2, LOW);
@@ -146,6 +144,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               digitalWrite(inPin1, LOW);
               digitalWrite(inPin2, LOW);
             }
+
+            // Потом включаем скорость (PWM)
+            analogWrite(pwmPin, speed);
 
             lastClientHbTime = millis();
             enableMotorProtection = true;
@@ -206,6 +207,11 @@ void setup() {
   digitalWrite(PIN_RELAY, HIGH);
 
   stopMotors();
+
+  digitalWrite(PIN_IN1, LOW);
+  digitalWrite(PIN_IN2, LOW);
+  digitalWrite(PIN_IN3, LOW);
+  digitalWrite(PIN_IN4, LOW);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
