@@ -31,6 +31,9 @@ unsigned long lastStatusTx = 0;
 unsigned long lastClientHbTime = 0;
 bool enableMotorProtection = false;
 
+unsigned long now = millis();
+unsigned long nowcmd = millis();
+
 // Типы сообщений
 #define CMD_IDENTIFY       0x01
 #define CMD_CLIENT_TYPE    0x02
@@ -106,7 +109,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
     case WStype_BIN:
       if (length == 0) return;
-
+      nowcmd = millis();
       uint8_t cmd = payload[0];
       Serial.printf("Получено бинарное: cmd=0x%02X, len=%d  ", cmd, length);
 
@@ -238,9 +241,9 @@ void loop() {
     return;
   }
 
-  unsigned long now = millis();
+  now = millis();
 
-  if (identified && now - lastStatusTx >= 30000) {
+  if (identified && now - lastStatusTx >= 5000  && now - nowcmd >= 2000) {
     lastStatusTx = now;
     sendFullStatus();
   }
