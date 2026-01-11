@@ -49,7 +49,7 @@ unsigned long nowcmd = millis();
 
 // ────────────────────────────────────────────────────────────────
 void sendBinary(const uint8_t* data, size_t len) {
-  if (client.isConnected()) {  // ← ИСПРАВЛЕНО: isConnected() вместо connected()
+  if (client.isConnected()) {
     client.sendBIN(data, len);
   }
 }
