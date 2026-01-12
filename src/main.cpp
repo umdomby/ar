@@ -7,8 +7,12 @@
 // ================ НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ ================
 const char* ssid = "Robolab124";                    // Ваш WiFi
 const char* password = "wifi123123123";
-const char* WS_HOST = "a.ardu.live";
-const uint16_t WS_PORT = 444;           // или 444, если сервер требует
+// const char* WS_HOST = "a.ardu.live";
+// const uint16_t WS_PORT = 444;           
+// const char* WS_PATH = "/wsar";
+
+const char* WS_HOST = "192.168.1.121";
+const uint16_t WS_PORT = 8096;           
 const char* WS_PATH = "/wsar";
 
 // УНИКАЛЬНЫЙ 16-ЗНАЧНЫЙ КОД УСТРОЙСТВА (A-Z, a-z, 0-9)
@@ -144,7 +148,8 @@ void setup() {
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  //webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 }
