@@ -23,6 +23,10 @@ const uint16_t ws_port = 444;
 const char* ws_path    = "/wsar";
 const char* DEVICE_ID  = "9999999999999999";  // 16 символов
 
+// В начале файла (после #defines)
+#define PWM_FREQ    25000   // 2 кГц — большинство не слышит, нагрев терпимый
+#define PWM_RES     8       // 0..255 как раньше
+
 ServoEasing Servo1, Servo2;
 WebSocketsClient client;
 
@@ -73,8 +77,10 @@ void sendFullStatus() {
 }
 
 void stopMotors() {
-  analogWrite(PIN_ENA, 0);
-  analogWrite(PIN_ENB, 0);
+  // analogWrite(PIN_ENA, 0);
+  // analogWrite(PIN_ENB, 0);
+  ledcWrite(0, 0);  // PIN_ENA, канал 0
+  ledcWrite(1, 0);  // PIN_ENB, канал 1
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -149,7 +155,12 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
 
             // Потом включаем скорость (PWM)
-            analogWrite(pwmPin, speed);
+            // analogWrite(pwmPin, speed);
+            if (motor == 'A') {
+              ledcWrite(0, speed);
+            } else {
+              ledcWrite(1, speed);
+            }
 
             lastClientHbTime = millis();
             enableMotorProtection = true;
@@ -215,6 +226,17 @@ void setup() {
   digitalWrite(PIN_IN2, LOW);
   digitalWrite(PIN_IN3, LOW);
   digitalWrite(PIN_IN4, LOW);
+
+  // В setup() — после pinMode() и перед WiFi.begin()
+  ledcSetup(0, PWM_FREQ, PWM_RES);   // канал 0 для ENA (PIN_ENA 18)
+  ledcSetup(1, PWM_FREQ, PWM_RES);   // канал 1 для ENB (PIN_ENB 15)
+
+  ledcAttachPin(PIN_ENA, 0);
+  ledcAttachPin(PIN_ENB, 1);
+
+  // начальное выключение (чтобы не было всплеска)
+  ledcWrite(0, 0);
+  ledcWrite(1, 0);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
