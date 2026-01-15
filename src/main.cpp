@@ -204,8 +204,9 @@ void setup() {
   Serial.println("\n=== Binary Protocol 2026 - ESP32-S3 - One Motor + One Servo ===\n");
 
   // Только одно серво
-  Servo2.attach(PIN_SERVO2, 90);
-  Servo2.write(90);
+  Servo2.attach(PIN_SERVO2, 50);
+  Servo2.write(50);
+  delay(50);
 
   // Мотор A
   pinMode(PIN_ENA, OUTPUT);
