@@ -3,7 +3,7 @@
 #include <WebSocketsClient.h>  // Links2004
 #include <ServoEasing.hpp>
 
-// Пины для ESP32-S3 (оставляем только один мотор и одно серво)
+// Пины для ESP32-S3 BTS7960
 #define PIN_ENA     18
 #define PIN_IN1     19
 #define PIN_IN2     20
