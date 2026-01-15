@@ -10,6 +10,9 @@
 #define PIN_IN3     21
 #define PIN_IN4     17
 #define PIN_ENB     15
+#define MOTOR_A_CHANNEL 4
+#define MOTOR_B_CHANNEL 5
+
 
 #define PIN_RELAY   16      // active LOW
 #define PIN_SERVO1  13
@@ -80,8 +83,10 @@ void sendFullStatus() {
 void stopMotors() {
   // analogWrite(PIN_ENA, 0);
   // analogWrite(PIN_ENB, 0);
-  ledcWrite(0, 0);  // PIN_ENA, канал 0
-  ledcWrite(1, 0);  // PIN_ENB, канал 1
+  // ledcWrite(0, 0);  // PIN_ENA, канал 0
+  // ledcWrite(1, 0);  // PIN_ENB, канал 1
+  ledcWrite(MOTOR_A_CHANNEL, 0);
+  ledcWrite(MOTOR_B_CHANNEL, 0);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -140,7 +145,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
             Serial.printf("→ MOTOR %c: speed=%d, dir=%d\n", motor, speed, dir);
 
-            uint8_t pwmPin = (motor == 'A') ? PIN_ENA : PIN_ENB;
             uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
             uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
 
@@ -155,12 +159,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               digitalWrite(inPin2, LOW);
             }
 
-            // Потом включаем скорость (PWM)
-            // analogWrite(pwmPin, speed);
+            // PWM через правильный канал
             if (motor == 'A') {
-              ledcWrite(0, speed);
+              ledcWrite(MOTOR_A_CHANNEL, speed);
             } else {
-              ledcWrite(1, speed);
+              ledcWrite(MOTOR_B_CHANNEL, speed);
             }
 
             lastClientHbTime = millis();
@@ -205,13 +208,15 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("\n=== Binary Protocol 2026 with HBT_MOTOR на ESP32-S3 ===\n");
+  Serial.println("\n=== Binary Protocol 2026 - ESP32-S3 - Servos first ===\n");
 
+  // !!! Самое важное — сервоприводы ПЕРВЫМИ !!!
   Servo1.attach(PIN_SERVO1, 90);
   Servo2.attach(PIN_SERVO2, 90);
   Servo1.write(90);
   Servo2.write(90);
 
+  // Теперь моторы
   pinMode(PIN_ENA, OUTPUT);
   pinMode(PIN_ENB, OUTPUT);
   pinMode(PIN_IN1, OUTPUT);
@@ -221,23 +226,23 @@ void setup() {
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, HIGH);
 
-  stopMotors();
+  stopMotors();  // пока 0 на моторах
 
   digitalWrite(PIN_IN1, LOW);
   digitalWrite(PIN_IN2, LOW);
   digitalWrite(PIN_IN3, LOW);
   digitalWrite(PIN_IN4, LOW);
 
-  // В setup() — после pinMode() и перед WiFi.begin()
-  ledcSetup(0, PWM_FREQ, PWM_RES);   // канал 0 для ENA (PIN_ENA 18)
-  ledcSetup(1, PWM_FREQ, PWM_RES);   // канал 1 для ENB (PIN_ENB 15)
+  // Настраиваем LEDC ДЛЯ МОТОРОВ после серво
+  ledcSetup(MOTOR_A_CHANNEL, PWM_FREQ, PWM_RES);   // 25000 Гц, 8 бит
+  ledcSetup(MOTOR_B_CHANNEL, PWM_FREQ, PWM_RES);
 
-  ledcAttachPin(PIN_ENA, 0);
-  ledcAttachPin(PIN_ENB, 1);
+  ledcAttachPin(PIN_ENA, MOTOR_A_CHANNEL);
+  ledcAttachPin(PIN_ENB, MOTOR_B_CHANNEL);
 
-  // начальное выключение (чтобы не было всплеска)
-  ledcWrite(0, 0);
-  ledcWrite(1, 0);
+  // сразу обнуляем
+  ledcWrite(MOTOR_A_CHANNEL, 0);
+  ledcWrite(MOTOR_B_CHANNEL, 0);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -249,9 +254,9 @@ void setup() {
   }
   Serial.printf("\nIP: %s\n", WiFi.localIP().toString().c_str());
 
-  client.beginSSL(ws_host, ws_port, ws_path);  // WSS подключение
+  client.beginSSL(ws_host, ws_port, ws_path);
   client.onEvent(webSocketEvent);
-  client.setReconnectInterval(3000);  // Автоматический реконнект
+  client.setReconnectInterval(3000);
 }
 
 void loop() {
