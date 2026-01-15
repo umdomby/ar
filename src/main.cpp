@@ -3,12 +3,12 @@
 #include <WebSocketsClient.h>  // Links2004
 #include <ServoEasing.hpp>
 
-// Пины для ESP32-S3 BTS7960
+// Пины для ESP32-S3 BTS7960 — оставляем только один мотор (A)
 #define PIN_ENA     18
 #define PIN_IN1     19
 #define PIN_IN2     20
 #define PIN_RELAY   16      // active LOW
-#define PIN_SERVO1  13
+#define PIN_SERVO2  14      // оставляем только второе серво
 #define PIN_VOLTAGE 4
 
 // Настройки
@@ -19,11 +19,13 @@ const uint16_t ws_port = 444;
 const char* ws_path    = "/wsar";
 const char* DEVICE_ID  = "9999999999999999";  // 16 символов
 
-// В начале файла
-#define PWM_FREQ    25000   // 25 кГц
+// PWM настройки
+#define PWM_FREQ    25000
 #define PWM_RES     8       // 0..255
 
-ServoEasing Servo1;
+#define MOTOR_A_CHANNEL 4
+
+ServoEasing Servo2;           // ← только одно серво
 WebSocketsClient client;
 
 bool identified = false;
@@ -58,8 +60,8 @@ void sendFullStatus() {
   uint8_t buf[9] = {0};
   buf[0] = RSP_FULL_STATUS;
   buf[1] = (digitalRead(PIN_RELAY) == LOW) ? 1 : 0;
-  buf[2] = Servo1.read();
-  buf[3] = 0;           // было Servo2 → теперь 0
+  buf[2] = Servo2.read();       // только одно серво
+  buf[3] = 0;                   // раньше было Servo2, теперь зарезервировано / пусто
 
   int raw = analogRead(PIN_VOLTAGE);
   buf[4] = highByte(raw);
@@ -73,7 +75,7 @@ void sendFullStatus() {
 }
 
 void stopMotors() {
-  ledcWrite(0, 0);  // только канал 0 (мотор A)
+  ledcWrite(MOTOR_A_CHANNEL, 0);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -132,11 +134,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
             // Принимаем только мотор A
             if (motor != 'A') {
-              Serial.println("→ Игнорируем команду для мотора B (его нет)");
+              Serial.println("→ Игнорируем мотор B — он отключен в прошивке");
               break;
             }
 
-            Serial.printf("→ MOTOR %c: speed=%d, dir=%d\n", motor, speed, dir);
+            Serial.printf("→ MOTOR A: speed=%d, dir=%d\n", speed, dir);
 
             if (dir == 1) {
               digitalWrite(PIN_IN1, HIGH);
@@ -149,7 +151,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
               digitalWrite(PIN_IN2, LOW);
             }
 
-            ledcWrite(0, speed);  // только мотор A
+            ledcWrite(MOTOR_A_CHANNEL, speed);
 
             lastClientHbTime = millis();
             enableMotorProtection = true;
@@ -161,12 +163,13 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
           {
             uint8_t num = payload[1];
             uint8_t angle = constrain(payload[2], 0, 180);
-            
-            if (num == 1) {
-              Serial.printf("→ SERVO 1 → angle=%d\n", angle);
-              Servo1.write(angle);
+
+            // Принимаем только серво 2
+            if (num == 2) {
+              Serial.printf("→ SERVO 2 → angle=%d\n", angle);
+              Servo2.write(angle);
             } else {
-              Serial.printf("→ Игнорируем SERVO %d (оставлен только 1)\n", num);
+              Serial.printf("→ Игнорируем SERVO %d — осталось только одно серво\n", num);
             }
           }
           break;
@@ -196,11 +199,13 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("\n=== Binary Protocol 2026 (1 motor + 1 servo) на ESP32-S3 ===\n");
+  Serial.println("\n=== Binary Protocol 2026 - ESP32-S3 - One Motor + One Servo ===\n");
 
-  Servo1.attach(PIN_SERVO1, 90);
-  Servo1.write(90);
+  // Только одно серво
+  Servo2.attach(PIN_SERVO2, 90);
+  Servo2.write(90);
 
+  // Мотор A
   pinMode(PIN_ENA, OUTPUT);
   pinMode(PIN_IN1, OUTPUT);
   pinMode(PIN_IN2, OUTPUT);
@@ -212,10 +217,10 @@ void setup() {
   digitalWrite(PIN_IN1, LOW);
   digitalWrite(PIN_IN2, LOW);
 
-  // PWM только для одного мотора
-  ledcSetup(0, PWM_FREQ, PWM_RES);   // канал 0 для ENA
-  ledcAttachPin(PIN_ENA, 0);
-  ledcWrite(0, 0);
+  // LEDC только для одного мотора
+  ledcSetup(MOTOR_A_CHANNEL, PWM_FREQ, PWM_RES);
+  ledcAttachPin(PIN_ENA, MOTOR_A_CHANNEL);
+  ledcWrite(MOTOR_A_CHANNEL, 0);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -257,11 +262,5 @@ void loop() {
     }
     stopMotors();
     enableMotorProtection = false;
-  } else if (enableMotorProtection && now - lastClientHbTime <= 700) {
-    static unsigned long lastPrint = 0;
-    if (now - lastPrint > 299) {
-      Serial.print("HBT_MOTOR ");
-      lastPrint = now;
-    }
   }
 }
