@@ -162,15 +162,17 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
           if (length < 4) { Serial.println("→ CMD_SERVO_ABS: слишком короткое"); break; }
           {
             uint8_t num = payload[1];
-            uint8_t angle = constrain(payload[2], 0, 180);
+            uint8_t value = payload[2];
 
             // Принимаем только серво 2
             if (num == 2) {
-              Serial.printf("→ SERVO 2 → angle=%d\n", angle);
-              Servo2.write(angle);
+                int angle = map(value, 0, 180, 0, 100);
+                angle = constrain(angle, 0, 100);
+                Serial.printf("SERVO 2: %d → %d°\n", value, angle);
+                Servo2.write(angle);
             } else {
-              Serial.printf("→ Игнорируем SERVO %d — осталось только одно серво\n", num);
-            }
+                Serial.println("Игнор серво ≠2");
+}
           }
           break;
 
