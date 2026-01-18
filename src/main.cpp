@@ -78,6 +78,6 @@ void motorStop()
 {
   analogWrite(PIN_EN, 0);
   // Можно и так (более "жёсткий" стоп):
-  // digitalWrite(PIN_IN1, LOW);
-  // digitalWrite(PIN_IN2, LOW);
+  digitalWrite(PIN_IN1, LOW);
+  digitalWrite(PIN_IN2, LOW);
 }
