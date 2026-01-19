@@ -20,13 +20,31 @@ void setup() {
 void loop() {
   static uint16_t hue = 0;
 
-  // Плавная радуга через HSV
-  uint32_t color = strip.ColorHSV(hue, 255, 255);   // hue 0..65535
-  strip.setPixelColor(0, color);
+  uint32_t rgb = strip.ColorHSV(hue, 255, 255);
+  uint8_t r = (rgb >> 16) & 0xFF;
+  uint8_t g = (rgb >> 8) & 0xFF;
+  uint8_t b = rgb & 0xFF;
+
+  // Цветное название для самых основных цветов (примерно)
+  const char* color_name = "???";
+  if (hue <  4000)  color_name = "Красный";
+  else if (hue < 12000) color_name = "Оранжевый";
+  else if (hue < 20000) color_name = "Жёлтый";
+  else if (hue < 30000) color_name = "Салатовый";
+  else if (hue < 38000) color_name = "Зелёный";
+  else if (hue < 46000) color_name = "Бирюзовый";
+  else if (hue < 54000) color_name = "Голубой";
+  else if (hue < 62000) color_name = "Синий";
+  else if (hue < 65536) color_name = "Фиолетовый";
+
+  Serial.printf("[%5u] %-10s  #%02X%02X%02X  (%3d,%3d,%3d)\n",
+                hue, color_name, r, g, b, r, g, b);
+
+  strip.setPixelColor(0, rgb);
   strip.show();
 
-  hue += 280;             // скорость: 150–450 — хороший диапазон
-  if (hue >= 65536) hue = 0;
+  hue += 280;
+  if (hue >= 65536) hue -= 65536;
 
-  delay(20);              // 15–35 мс — плавно и красиво
+  delay(30);
 }
