@@ -1,68 +1,71 @@
-// ESP32 code: src/main.cpp (for PlatformIO) or .ino for Arduino IDE
-
 #include <Arduino.h>
-#include <Adafruit_NeoPixel.h>
-#include <WiFi.h>
+#include <ESP32Servo.h>
 
-#define BRIGHTNESS 30     // 20–60 обычно комфортно, 255 = очень ярко
-#define PIN_LED    48    // 38 - если новая версия платы
-#define NUM_LEDS   1
+Servo servo1;
+Servo servo2;
+Servo servo3;
+Servo servo4;
 
-// WiFi credentials (replace with your own)
-#define WIFI_SSID "Robolab124"
-#define WIFI_PASSWORD "wifi123123123"
+const int PIN_SERVO1 = 4;
+const int PIN_SERVO2 = 16;
+const int PIN_SERVO3 = 17;
+const int PIN_SERVO4 = 18;
 
-// Default server (PC) IP and port - these can be changed and reflashed
-#define SERVER_IP "192.168.1.121"
-#define SERVER_PORT 5000
+// ─── Функцию перемещаем наверх ────────────────────────────────
+void moveServo(Servo &servo, const char* name)
+{
+  Serial.print(name);
+  Serial.println(" → начинает движение");
 
-Adafruit_NeoPixel strip(NUM_LEDS, PIN_LED, NEO_GRB + NEO_KHZ800);
-WiFiClient client;
-
-void setup() {
-  Serial.begin(115200);
-  delay(300);
-  Serial.println("\nRainbow ESP32-S3-DevKitC-1 Network Control");
-
-  // Connect to WiFi
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  Serial.println("  90 → 0");
+  for (int pos = 90; pos >= 0; pos -= 1) {
+    servo.write(pos);
+    delay(15);
   }
-  Serial.println("\nConnected to WiFi");
-  Serial.print("ESP32 IP: ");
-  Serial.println(WiFi.localIP());
+  delay(300);
 
-  strip.begin();
-  strip.setBrightness(BRIGHTNESS);
-  strip.show();          // сразу выключаем
+  Serial.println("  0 → 180");
+  for (int pos = 0; pos <= 180; pos += 1) {
+    servo.write(pos);
+    delay(15);
+  }
+  delay(400);
+
+  Serial.println("  180 → 90");
+  for (int pos = 180; pos >= 90; pos -= 1) {
+    servo.write(pos);
+    delay(15);
+  }
+  delay(500);
+
+  Serial.println("  → вернулся в 90\n");
 }
 
-void loop() {
-  if (!client.connected()) {
-    if (client.connect(SERVER_IP, SERVER_PORT)) {
-      Serial.println("Connected to server");
-    } else {
-      Serial.println("Connection failed - retrying in 5s");
-      delay(5000);
-      return;
-    }
-  }
+void setup() 
+{
+  Serial.begin(115200);
+  delay(200);
 
-  // Read RGB commands (3 bytes: R, G, B)
-  if (client.available() >= 3) {
-    uint8_t r = client.read();
-    uint8_t g = client.read();
-    uint8_t b = client.read();
+  servo1.attach(PIN_SERVO1);
+  servo2.attach(PIN_SERVO2);
+  servo3.attach(PIN_SERVO3);
+  servo4.attach(PIN_SERVO4);
 
-    // Set the LED color
-    strip.setPixelColor(0, r, g, b);
-    strip.show();
+  Serial.println("Старт последовательности 4 сервоприводов");
 
-    // Optional debug print
-    Serial.printf("Set color: (%d, %d, %d)\n", r, g, b);
-  }
+  servo1.write(90);
+  servo2.write(90);
+  servo3.write(90);
+  servo4.write(90);
+  delay(800);
+}
 
-  delay(10);  // Small delay to avoid busy loop
+void loop() 
+{
+  moveServo(servo1, "Servo 1");
+  moveServo(servo2, "Servo 2");
+  moveServo(servo3, "Servo 3");
+  moveServo(servo4, "Servo 4");
+
+  delay(600);
 }
