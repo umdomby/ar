@@ -6,10 +6,10 @@ Servo servo2;
 Servo servo3;
 Servo servo4;
 
-const int PIN_SERVO1 = 4;
-const int PIN_SERVO2 = 16;
-const int PIN_SERVO3 = 17;
-const int PIN_SERVO4 = 18;
+const int PIN_SERVO1 = 9;
+const int PIN_SERVO2 = 10;
+const int PIN_SERVO3 = 11;
+const int PIN_SERVO4 = 12;
 
 // ─── Функцию перемещаем наверх ────────────────────────────────
 void moveServo(Servo &servo, const char* name)
