@@ -17,22 +17,22 @@ void moveServo(Servo &servo, const char* name)
   Serial.print(name);
   Serial.println(" → начинает движение");
 
-  Serial.println("  90 → 0");
-  for (int pos = 90; pos >= 0; pos -= 1) {
+  Serial.println("  60 → 0");
+  for (int pos = 90; pos >= 60; pos -= 1) {
     servo.write(pos);
     delay(15);
   }
   delay(300);
 
-  Serial.println("  0 → 180");
-  for (int pos = 0; pos <= 180; pos += 1) {
+  Serial.println("  0 → 120");
+  for (int pos = 60; pos <= 120; pos += 1) {
     servo.write(pos);
     delay(15);
   }
   delay(400);
 
-  Serial.println("  180 → 90");
-  for (int pos = 180; pos >= 90; pos -= 1) {
+  Serial.println("  120 → 90");
+  for (int pos = 120; pos >= 90; pos -= 1) {
     servo.write(pos);
     delay(15);
   }
