@@ -1,23 +1,23 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebSocketsClient.h>  // Links2004
-#include <ServoEasing.hpp>
+// #include <ServoEasing.hpp>
 
 // Пины для ESP32-S3 BTS7960
-#define PIN_ENA     18
-#define PIN_IN1     19
-#define PIN_IN2     20
-#define PIN_IN3     21
-#define PIN_IN4     17
-#define PIN_ENB     15
+#define PIN_ENA     4
+#define PIN_IN1     15
+#define PIN_IN2     16
+#define PIN_IN3     17
+#define PIN_IN4     18
+#define PIN_ENB     5
 #define MOTOR_A_CHANNEL 4
 #define MOTOR_B_CHANNEL 5
 
 
-#define PIN_RELAY   16      // active LOW
-#define PIN_SERVO1  13
-#define PIN_SERVO2  14
-#define PIN_VOLTAGE 4
+#define PIN_RELAY   10      // active LOW
+// #define PIN_SERVO1  13
+// #define PIN_SERVO2  14
+#define PIN_VOLTAGE 8
 
 // Настройки
 const char* ssid       = "Robolab124";
@@ -31,7 +31,7 @@ const char* DEVICE_ID  = "9999999999999999";  // 16 символов
 #define PWM_FREQ    25000   // 2 кГц — большинство не слышит, нагрев терпимый
 #define PWM_RES     8       // 0..255 как раньше
 
-ServoEasing Servo1, Servo2;
+// ServoEasing Servo1, Servo2;
 WebSocketsClient client;
 
 bool identified = false;
@@ -66,8 +66,8 @@ void sendFullStatus() {
   uint8_t buf[9] = {0};
   buf[0] = RSP_FULL_STATUS;
   buf[1] = (digitalRead(PIN_RELAY) == LOW) ? 1 : 0;
-  buf[2] = Servo1.read();
-  buf[3] = Servo2.read();
+  // buf[2] = Servo1.read();
+  // buf[3] = Servo2.read();
 
   int raw = analogRead(PIN_VOLTAGE);
   buf[4] = highByte(raw);
@@ -178,8 +178,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             uint8_t angle = constrain(payload[2], 0, 180);
             Serial.printf("→ SERVO %d → angle=%d\n", num, angle);
 
-            if (num == 1) Servo1.write(angle);
-            else if (num == 2) Servo2.write(angle);
+            // if (num == 1) Servo1.write(angle);
+            // else if (num == 2) Servo2.write(angle);
           }
           break;
 
@@ -211,10 +211,10 @@ void setup() {
   Serial.println("\n=== Binary Protocol 2026 - ESP32-S3 - Servos first ===\n");
 
   // !!! Самое важное — сервоприводы ПЕРВЫМИ !!!
-  Servo1.attach(PIN_SERVO1, 90);
-  Servo2.attach(PIN_SERVO2, 90);
-  Servo1.write(90);
-  Servo2.write(90);
+  // Servo1.attach(PIN_SERVO1, 90);
+  // Servo2.attach(PIN_SERVO2, 90);
+  // Servo1.write(90);
+  // Servo2.write(90);
 
   // Теперь моторы
   pinMode(PIN_ENA, OUTPUT);
