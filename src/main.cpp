@@ -13,8 +13,11 @@
 #define MOTOR_A_CHANNEL 4
 #define MOTOR_B_CHANNEL 5
 
+// 1 ENC 6, PIN_IN5 9, PIN_IN6 10  
+// 2 END 7, PIN_IN5 11, PIN_IN6 12
 
-#define PIN_RELAY   10      // active LOW
+
+#define PIN_RELAY   3      
 // #define PIN_SERVO1  13
 // #define PIN_SERVO2  14
 #define PIN_VOLTAGE 8
