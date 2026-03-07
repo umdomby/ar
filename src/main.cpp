@@ -1,297 +1,221 @@
-#include <Arduino.h>
+// ======================================================================
+//  ESP32 WebSocket сервер с управлением моторами
+//  Статический IP: 192.168.1.201
+//  Подключение:    ws://192.168.1.201/ws
+//  Дата:           март 2026
+// ======================================================================
+
 #include <WiFi.h>
-#include <WebSocketsClient.h>  // Links2004
-// #include <ServoEasing.hpp>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncWebSocket.h>
 
-// Пины для ESP32-S3 BTS7960
-#define PIN_ENA     4
-#define PIN_IN1     15
-#define PIN_IN2     16
-#define PIN_IN3     17
-#define PIN_IN4     18
-#define PIN_ENB     5
-#define MOTOR_A_CHANNEL 4
-#define MOTOR_B_CHANNEL 5
+// ─── Wi-Fi настройки ────────────────────────────────────────────────
+const char* ssid     = "Robolab124";
+const char* password = "wifi123123123";
 
-// 1 ENC 6, PIN_IN5 9, PIN_IN6 10  
-// 2 END 7, PIN_IN5 11, PIN_IN6 12
+// ─── Статический IP ─────────────────────────────────────────────────
+IPAddress local_IP(192, 168, 1, 201);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress primaryDNS(8, 8, 8, 8);    // Google DNS
+IPAddress secondaryDNS(8, 8, 4, 4);
 
+// ─── Пины для моторов (BTS7960 / аналог) ────────────────────────────
+#define PIN_ENA   4     // PWM скорость A
+#define PIN_IN1   15    // направление A1
+#define PIN_IN2   16    // направление A2
+#define PIN_ENB   5     // PWM скорость B
+#define PIN_IN3   17    // направление B1
+#define PIN_IN4   18    // направление B2
 
-#define PIN_RELAY   3      
-// #define PIN_SERVO1  13
-// #define PIN_SERVO2  14
-#define PIN_VOLTAGE 8
+// ─── PWM параметры ──────────────────────────────────────────────────
+#define PWM_FREQ    25000
+#define PWM_RES     8
+#define PWM_CH_A    0
+#define PWM_CH_B    1
 
-// Настройки
-const char* ssid       = "Robolab124";
-const char* password   = "wifi123123123";
-const char* ws_host    = "a.ardu.live";
-const uint16_t ws_port = 444;
-const char* ws_path    = "/wsar";
-const char* DEVICE_ID  = "9999999999999999";  // 16 символов
+// ─── WebSocket путь ─────────────────────────────────────────────────
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
-// В начале файла (после #defines)
-#define PWM_FREQ    25000   // 2 кГц — большинство не слышит, нагрев терпимый
-#define PWM_RES     8       // 0..255 как раньше
+// ─── Таймаут безопасности моторов ──────────────────────────────────
+unsigned long lastMotorCommandTime = 0;
+const unsigned long MOTOR_TIMEOUT_MS = 800;     // стоп, если нет команд > 800 мс
 
-// ServoEasing Servo1, Servo2;
-WebSocketsClient client;
-
-bool identified = false;
-unsigned long lastStatusTx = 0;
-unsigned long lastClientHbTime = 0;
-bool enableMotorProtection = false;
-
-unsigned long now = millis();
-unsigned long nowcmd = millis();
-
-// Типы сообщений
-#define CMD_IDENTIFY       0x01
-#define CMD_CLIENT_TYPE    0x02
-#define CMD_HEARTBEAT      0x10
-#define CMD_HBT_MOTOR      0x11
-#define CMD_MOTOR          0x20
-#define CMD_SERVO_ABS      0x30
-#define CMD_RELAY          0x40
-#define CMD_ALARM          0x41
-
-#define RSP_FULL_STATUS    0x50
-#define RSP_ACK            0x51
-
-// ────────────────────────────────────────────────────────────────
-void sendBinary(const uint8_t* data, size_t len) {
-  if (client.isConnected()) {
-    client.sendBIN(data, len);
-  }
-}
-
-void sendFullStatus() {
-  uint8_t buf[9] = {0};
-  buf[0] = RSP_FULL_STATUS;
-  buf[1] = (digitalRead(PIN_RELAY) == LOW) ? 1 : 0;
-  // buf[2] = Servo1.read();
-  // buf[3] = Servo2.read();
-
-  int raw = analogRead(PIN_VOLTAGE);
-  buf[4] = highByte(raw);
-  buf[5] = lowByte(raw);
-
-  buf[6] = 0;
-  buf[7] = 0;
-  buf[8] = (uint8_t)constrain(WiFi.RSSI(), -128, 127);
-
-  sendBinary(buf, sizeof(buf));
-}
-
-void stopMotors() {
-  // analogWrite(PIN_ENA, 0);
-  // analogWrite(PIN_ENB, 0);
-  // ledcWrite(0, 0);  // PIN_ENA, канал 0
-  // ledcWrite(1, 0);  // PIN_ENB, канал 1
-  ledcWrite(MOTOR_A_CHANNEL, 0);
-  ledcWrite(MOTOR_B_CHANNEL, 0);
-}
-
-// ────────────────────────────────────────────────────────────────
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      Serial.println("[WS] Disconnected");
-      identified = false;
-      stopMotors();
-      enableMotorProtection = false;
+// =====================================================================
+//  Обработчик WebSocket событий
+// =====================================================================
+void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client,
+               AwsEventType type, void * arg, uint8_t *data, size_t len)
+{
+  switch (type)
+  {
+    case WS_EVT_CONNECT:
+      Serial.printf("[WS] Клиент #%u подключился  IP: %s\n", 
+                    client->id(), client->remoteIP().toString().c_str());
+      client->text("ESP32 WebSocket ready");
       break;
 
-    case WStype_CONNECTED:
-      Serial.printf("[WS] Connected to url: %s\n", payload);
-
-      // Тип клиента
-      {
-        uint8_t buf[2] = {CMD_CLIENT_TYPE, 2};
-        sendBinary(buf, 2);
-      }
-
-      // Идентификация
-      {
-        uint8_t buf[17];
-        buf[0] = CMD_IDENTIFY;
-        memcpy(buf + 1, DEVICE_ID, 16);
-        sendBinary(buf, 17);
-      }
-
-      identified = true;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("[WS] Клиент #%u отключился\n", client->id());
       break;
 
-    case WStype_BIN:
-      if (length == 0) return;
-      nowcmd = millis();
-      uint8_t cmd = payload[0];
-      Serial.printf("Получено бинарное: cmd=0x%02X, len=%d  ", cmd, length);
-
-      switch (cmd) {
-        case CMD_HEARTBEAT:
-          Serial.println("→ HEARTBEAT");
-          break;
-
-        case CMD_HBT_MOTOR:
-          Serial.print("HBT_MOTOR ");
-          lastClientHbTime = millis();
-          enableMotorProtection = true;
-          break;
-
-        case CMD_MOTOR:
-          if (length < 5) { Serial.println("→ CMD_MOTOR: слишком короткое"); break; }
-          {
-            char motor = payload[1];
-            uint8_t speed = payload[2];
-            uint8_t dir = payload[3];
-
-            Serial.printf("→ MOTOR %c: speed=%d, dir=%d\n", motor, speed, dir);
-
-            uint8_t inPin1 = (motor == 'A') ? PIN_IN1 : PIN_IN3;
-            uint8_t inPin2 = (motor == 'A') ? PIN_IN2 : PIN_IN4;
-
-            if (dir == 1) {
-              digitalWrite(inPin1, HIGH);
-              digitalWrite(inPin2, LOW);
-            } else if (dir == 2) {
-              digitalWrite(inPin1, LOW);
-              digitalWrite(inPin2, HIGH);
-            } else {
-              digitalWrite(inPin1, LOW);
-              digitalWrite(inPin2, LOW);
-            }
-
-            // PWM через правильный канал
-            if (motor == 'A') {
-              ledcWrite(MOTOR_A_CHANNEL, speed);
-            } else {
-              ledcWrite(MOTOR_B_CHANNEL, speed);
-            }
-
-            lastClientHbTime = millis();
-            enableMotorProtection = true;
-          }
-          break;
-
-        case CMD_SERVO_ABS:
-          if (length < 4) { Serial.println("→ CMD_SERVO_ABS: слишком короткое"); break; }
-          {
-            uint8_t num = payload[1];
-            uint8_t angle = constrain(payload[2], 0, 180);
-            Serial.printf("→ SERVO %d → angle=%d\n", num, angle);
-
-            // if (num == 1) Servo1.write(angle);
-            // else if (num == 2) Servo2.write(angle);
-          }
-          break;
-
-        case CMD_RELAY:
-          if (length < 3) { Serial.println("→ CMD_RELAY: слишком короткое"); break; }
-          {
-            uint8_t state = payload[1];
-            Serial.printf("→ RELAY state=%d\n", state);
-            digitalWrite(PIN_RELAY, state ? LOW : HIGH);
-          }
-          break;
-
-        case CMD_ALARM:
-          if (length < 2) { Serial.println("→ CMD_ALARM: слишком короткое"); break; }
-          Serial.printf("→ ALARM state=%d\n", payload[1]);
-          break;
-
-        default:
-          Serial.printf("→ НЕИЗВЕСТНАЯ КОМАНДА 0x%02X\n", cmd);
+    case WS_EVT_DATA:
+    {
+      AwsFrameInfo * info = (AwsFrameInfo*)arg;
+      if (!info->final || info->index != 0 || info->len != len) {
+        return; // поддерживаем только цельные кадры
       }
+
+      if (info->opcode == WS_BINARY && len >= 1)
+      {
+        lastMotorCommandTime = millis();
+
+        uint8_t cmd = data[0];
+
+        if (cmd == 0x20 && len >= 4)          // CMD_MOTOR
+        {
+          uint8_t motor_char = data[1];       // 'A'=65, 'B'=66
+          uint8_t speed = data[2];            // 0..255
+          uint8_t dir   = data[3];            // 0=стоп, 1=вперёд, 2=назад
+
+          bool isA = (motor_char == 'A' || motor_char == 65);
+          bool isB = (motor_char == 'B' || motor_char == 66);
+
+          if (isA || isB)
+          {
+            uint8_t ch   = isA ? PWM_CH_A : PWM_CH_B;
+            uint8_t pin1 = isA ? PIN_IN1 : PIN_IN3;
+            uint8_t pin2 = isA ? PIN_IN2 : PIN_IN4;
+
+            // Устанавливаем направление
+            digitalWrite(pin1, (dir == 1) ? HIGH : LOW);
+            digitalWrite(pin2, (dir == 2) ? HIGH : LOW);
+
+            // Скорость (0 при стопе)
+            ledcWrite(ch, (dir == 0) ? 0 : speed);
+
+            Serial.printf("[MOTOR] %c  speed=%3d  dir=%d\n", 
+                          isA ? 'A' : 'B', speed, dir);
+          }
+        }
+        else if (cmd == 0x11)                 // CMD_HBT_MOTOR (heartbeat)
+        {
+          lastMotorCommandTime = millis();
+          // Serial.println("[WS] HBT_MOTOR received");
+        }
+        else
+        {
+          Serial.printf("[WS] Неизвестная команда 0x%02X  len=%d\n", cmd, len);
+        }
+      }
+      break;
+    }
+
+    default:
       break;
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-void setup() {
-  Serial.begin(115200);
-  delay(200);
-  Serial.println("\n=== Binary Protocol 2026 - ESP32-S3 - Servos first ===\n");
-
-  // !!! Самое важное — сервоприводы ПЕРВЫМИ !!!
-  // Servo1.attach(PIN_SERVO1, 90);
-  // Servo2.attach(PIN_SERVO2, 90);
-  // Servo1.write(90);
-  // Servo2.write(90);
-
-  // Теперь моторы
-  pinMode(PIN_ENA, OUTPUT);
-  pinMode(PIN_ENB, OUTPUT);
-  pinMode(PIN_IN1, OUTPUT);
-  pinMode(PIN_IN2, OUTPUT);
-  pinMode(PIN_IN3, OUTPUT);
-  pinMode(PIN_IN4, OUTPUT);
-  pinMode(PIN_RELAY, OUTPUT);
-  digitalWrite(PIN_RELAY, HIGH);
-
-  stopMotors();  // пока 0 на моторах
-
+// =====================================================================
+//  Остановить оба мотора
+// =====================================================================
+void stopMotors()
+{
+  ledcWrite(PWM_CH_A, 0);
+  ledcWrite(PWM_CH_B, 0);
   digitalWrite(PIN_IN1, LOW);
   digitalWrite(PIN_IN2, LOW);
   digitalWrite(PIN_IN3, LOW);
   digitalWrite(PIN_IN4, LOW);
+}
 
-  // Настраиваем LEDC ДЛЯ МОТОРОВ после серво
-  ledcSetup(MOTOR_A_CHANNEL, PWM_FREQ, PWM_RES);   // 25000 Гц, 8 бит
-  ledcSetup(MOTOR_B_CHANNEL, PWM_FREQ, PWM_RES);
+// =====================================================================
+//  SETUP
+// =====================================================================
+void setup()
+{
+  Serial.begin(115200);
+  delay(200);
+  Serial.println("\n=== ESP32 WebSocket Motor Control  192.168.1.201 ===\n");
 
-  ledcAttachPin(PIN_ENA, MOTOR_A_CHANNEL);
-  ledcAttachPin(PIN_ENB, MOTOR_B_CHANNEL);
-
-  // сразу обнуляем
-  ledcWrite(MOTOR_A_CHANNEL, 0);
-  ledcWrite(MOTOR_B_CHANNEL, 0);
-
+  // Настройка статического IP
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("Ошибка настройки статического IP!");
+  } else {
+    Serial.println("Статический IP задан → 192.168.1.201");
+  }
 
-  Serial.print("WiFi ");
+  WiFi.begin(ssid, password);
+  Serial.print("Подключение к WiFi ");
   while (WiFi.status() != WL_CONNECTED) {
     delay(400);
     Serial.print(".");
   }
-  Serial.printf("\nIP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.println("\nПодключено!");
+  Serial.print("IP адрес: ");   Serial.println(WiFi.localIP());
+  Serial.print("MAC: ");        Serial.println(WiFi.macAddress());
 
-  client.beginSSL(ws_host, ws_port, ws_path);
-  client.onEvent(webSocketEvent);
-  client.setReconnectInterval(3000);
+  // Настройка пинов моторов
+  pinMode(PIN_IN1, OUTPUT);
+  pinMode(PIN_IN2, OUTPUT);
+  pinMode(PIN_IN3, OUTPUT);
+  pinMode(PIN_IN4, OUTPUT);
+
+  // PWM каналы
+  ledcSetup(PWM_CH_A, PWM_FREQ, PWM_RES);
+  ledcSetup(PWM_CH_B, PWM_FREQ, PWM_RES);
+  ledcAttachPin(PIN_ENA, PWM_CH_A);
+  ledcAttachPin(PIN_ENB, PWM_CH_B);
+
+  stopMotors();
+
+  // WebSocket
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
+
+  // Простая страница для проверки в браузере
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String msg = "WebSocket сервер работает\n";
+    msg += "Подключайтесь: ws://192.168.1.201/ws\n";
+    msg += "Время: " + String(millis() / 1000) + " сек";
+    request->send(200, "text/plain", msg);
+  });
+
+  server.begin();
+
+  Serial.println("Готово → ws://192.168.1.201/ws");
 }
 
-void loop() {
-  client.loop();  // Делает всё: poll, reconnect, обработку событий
+// =====================================================================
+//  LOOP
+// =====================================================================
+void loop()
+{
+  ws.cleanupClients();
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi lost → reconnect");
-    WiFi.reconnect();
-    delay(2000);
-    return;
-  }
+  static bool motorsStopped = false;
 
-  now = millis();
-
-  if (identified && now - lastStatusTx >= 5000  && now - nowcmd >= 2000) {
-    lastStatusTx = now;
-    sendFullStatus();
-  }
-
-  if (identified && enableMotorProtection && now - lastClientHbTime > 700) {
-    static bool warned = false;
-    if (!warned) {
-      Serial.println("\nHBT_MOTOR TIMEOUT → STOP MOTORS");
-      warned = true;
-    }
-    stopMotors();
-    enableMotorProtection = false;
-  } else if (enableMotorProtection && now - lastClientHbTime <= 700) {
-    static unsigned long lastPrint = 0;
-    if (now - lastPrint > 299) {
-      Serial.print("HBT_MOTOR ");
-      lastPrint = now;
+  if (millis() - lastMotorCommandTime > MOTOR_TIMEOUT_MS)
+  {
+    if (!motorsStopped)
+    {
+      Serial.println("TIMEOUT → motors stopped");
+      stopMotors();
+      motorsStopped = true;
     }
   }
+  else
+  {
+    if (motorsStopped)
+    {
+      Serial.println("Получена команда → моторы снова активны");
+      motorsStopped = false;
+    }
+  }
+
+  delay(4);
 }
