@@ -241,6 +241,7 @@ void loop()
                     currentSpeedA = (currentSpeedA > BRAKE_STEP) ? currentSpeedA - BRAKE_STEP : 0;
                     ledcWrite(PWM_CH_A, currentSpeedA);
                 }
+                
 
                 if (currentSpeedB > 0)
                 {
