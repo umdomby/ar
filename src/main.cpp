@@ -43,6 +43,19 @@ AsyncWebSocket ws("/ws");
 unsigned long lastMotorCommandTime = 0;
 const unsigned long MOTOR_TIMEOUT_MS = 500;     // стоп, если нет команд > 800 мс
 
+
+// Текущие скорости моторов (обновляются при командах и торможении)
+uint8_t currentSpeedA = 0;
+uint8_t currentSpeedB = 0;
+
+// Флаг плавного торможения
+bool isBraking = false;
+
+// Время начала торможения и шаг уменьшения
+unsigned long brakingLastUpdate = 0;
+const uint8_t BRAKE_STEP = 5;         // шаг уменьшения скорости (5 единиц)
+const unsigned long BRAKE_INTERVAL_MS = 20;  // интервал обновления (каждые 20 мс)
+
 // =====================================================================
 //  Обработчик WebSocket событий
 // =====================================================================
@@ -76,29 +89,34 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client,
 
         if (cmd == 0x20 && len >= 4)          // CMD_MOTOR
         {
-          uint8_t motor_char = data[1];       // 'A'=65, 'B'=66
-          uint8_t speed = data[2];            // 0..255
-          uint8_t dir   = data[3];            // 0=стоп, 1=вперёд, 2=назад
+            uint8_t motor_char = data[1];       // 'A'=65, 'B'=66
+            uint8_t speed = data[2];            // 0..255
+            uint8_t dir   = data[3];            // 0=стоп, 1=вперёд, 2=назад
 
-          bool isA = (motor_char == 'A' || motor_char == 65);
-          bool isB = (motor_char == 'B' || motor_char == 66);
+            bool isA = (motor_char == 'A' || motor_char == 65);
+            bool isB = (motor_char == 'B' || motor_char == 66);
 
-          if (isA || isB)
-          {
-            uint8_t ch   = isA ? PWM_CH_A : PWM_CH_B;
-            uint8_t pin1 = isA ? PIN_IN1 : PIN_IN3;
-            uint8_t pin2 = isA ? PIN_IN2 : PIN_IN4;
+            if (isA || isB)
+            {
+                uint8_t ch   = isA ? PWM_CH_A : PWM_CH_B;
+                uint8_t pin1 = isA ? PIN_IN1 : PIN_IN3;
+                uint8_t pin2 = isA ? PIN_IN2 : PIN_IN4;
 
-            // Устанавливаем направление
-            digitalWrite(pin1, (dir == 1) ? HIGH : LOW);
-            digitalWrite(pin2, (dir == 2) ? HIGH : LOW);
+                // Устанавливаем направление
+                digitalWrite(pin1, (dir == 1) ? HIGH : LOW);
+                digitalWrite(pin2, (dir == 2) ? HIGH : LOW);
 
-            // Скорость (0 при стопе)
-            ledcWrite(ch, (dir == 0) ? 0 : speed);
+                // Скорость (0 при стопе)
+                uint8_t effectiveSpeed = (dir == 0) ? 0 : speed;
+                ledcWrite(ch, effectiveSpeed);
 
-            Serial.printf("[MOTOR] %c  speed=%3d  dir=%d\n", 
-                          isA ? 'A' : 'B', speed, dir);
-          }
+                // Обновляем текущую скорость
+                if (isA) currentSpeedA = effectiveSpeed;
+                else currentSpeedB = effectiveSpeed;
+
+                Serial.printf("[MOTOR] %c  speed=%3d  dir=%d\n", 
+                              isA ? 'A' : 'B', speed, dir);
+            }
         }
         else if (cmd == 0x11)                 // CMD_HBT_MOTOR (heartbeat)
         {
@@ -195,28 +213,60 @@ void setup()
 // =====================================================================
 void loop()
 {
-  ws.cleanupClients();
+    ws.cleanupClients();
 
-  static bool motorsStopped = true;   // начинаем с предположения, что моторы остановлены
+    unsigned long now = millis();
 
-  unsigned long now = millis();
-  if (now - lastMotorCommandTime > MOTOR_TIMEOUT_MS)
-  {
-    if (!motorsStopped)
+    // Проверяем таймаут
+    if (now - lastMotorCommandTime > MOTOR_TIMEOUT_MS)
     {
-      Serial.println("TIMEOUT → motors stopped (no data >500ms)");
-      stopMotors();
-      motorsStopped = true;
-    }
-  }
-  else
-  {
-    if (motorsStopped)
-    {
-      Serial.println("Получена команда → моторы снова активны");
-      motorsStopped = false;
-    }
-  }
+        // Если команды не приходят >500 мс, начинаем или продолжаем торможение
+        if (!isBraking && (currentSpeedA > 0 || currentSpeedB > 0))
+        {
+            Serial.println("TIMEOUT → starting smooth braking");
+            isBraking = true;
+            brakingLastUpdate = now;
+        }
 
-  delay(4);   // небольшая пауза, чтобы не грузить CPU на 100%
+        // Плавное торможение, если флаг активен
+        if (isBraking)
+        {
+            if (now - brakingLastUpdate >= BRAKE_INTERVAL_MS)
+            {
+                brakingLastUpdate = now;
+
+                // Уменьшаем скорости на шаг
+                if (currentSpeedA > 0)
+                {
+                    currentSpeedA = (currentSpeedA > BRAKE_STEP) ? currentSpeedA - BRAKE_STEP : 0;
+                    ledcWrite(PWM_CH_A, currentSpeedA);
+                }
+
+                if (currentSpeedB > 0)
+                {
+                    currentSpeedB = (currentSpeedB > BRAKE_STEP) ? currentSpeedB - BRAKE_STEP : 0;
+                    ledcWrite(PWM_CH_B, currentSpeedB);
+                }
+
+                // Если обе скорости =0, завершаем торможение
+                if (currentSpeedA == 0 && currentSpeedB == 0)
+                {
+                    Serial.println("Braking complete → motors stopped");
+                    stopMotors();  // финальная очистка пинов
+                    isBraking = false;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Если команды приходят (lastMotorCommandTime свежий), сбрасываем торможение
+        if (isBraking)
+        {
+            Serial.println("New command received → interrupting braking");
+            isBraking = false;
+        }
+    }
+
+    delay(4);
 }
