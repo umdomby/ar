@@ -1,5 +1,5 @@
 // ======================================================================
-//  ESP32 WebSocket сервер с управлением моторами
+//  ESP32 WebSocket сервер с управлением моторами 111
 //  Статический IP: 192.168.1.201
 //  Подключение:    ws://192.168.1.201/ws
 //  Дата:           март 2026
@@ -241,7 +241,7 @@ void loop()
                     currentSpeedA = (currentSpeedA > BRAKE_STEP) ? currentSpeedA - BRAKE_STEP : 0;
                     ledcWrite(PWM_CH_A, currentSpeedA);
                 }
-                
+
 
                 if (currentSpeedB > 0)
                 {
