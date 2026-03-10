@@ -41,7 +41,7 @@ AsyncWebSocket ws("/ws");
 
 // ─── Таймаут безопасности моторов ──────────────────────────────────
 unsigned long lastMotorCommandTime = 0;
-const unsigned long MOTOR_TIMEOUT_MS = 800;     // стоп, если нет команд > 800 мс
+const unsigned long MOTOR_TIMEOUT_MS = 500;     // стоп, если нет команд > 800 мс
 
 // =====================================================================
 //  Обработчик WebSocket событий
@@ -197,13 +197,14 @@ void loop()
 {
   ws.cleanupClients();
 
-  static bool motorsStopped = false;
+  static bool motorsStopped = true;   // начинаем с предположения, что моторы остановлены
 
-  if (millis() - lastMotorCommandTime > MOTOR_TIMEOUT_MS)
+  unsigned long now = millis();
+  if (now - lastMotorCommandTime > MOTOR_TIMEOUT_MS)
   {
     if (!motorsStopped)
     {
-      Serial.println("TIMEOUT → motors stopped");
+      Serial.println("TIMEOUT → motors stopped (no data >500ms)");
       stopMotors();
       motorsStopped = true;
     }
@@ -217,5 +218,5 @@ void loop()
     }
   }
 
-  delay(4);
+  delay(4);   // небольшая пауза, чтобы не грузить CPU на 100%
 }
